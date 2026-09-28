@@ -610,10 +610,8 @@ async function loadPos(){
 
 // ---- ແຖບບິນຄ້າງ (ສະແດງຢູ່ໜ້າຂາຍຕະຫຼອດ) ----
 let OT = [];
-// ວັນທີຂອງບິນຄ້າງ (ແກ້ໄຂໄດ້) — ເກັບໃນເຄື່ອງນີ້ + ສົ່ງ createdAt ໄປ Api.gs
-const OTD = { get(){ try{ return JSON.parse(store.get('pos_ot_dates') || '{}') }catch(e){ return {} } },
-  set(id, v){ if(!id) return; const m = OTD.get(); if(v) m[id] = v; else delete m[id]; store.set('pos_ot_dates', JSON.stringify(m)); } };
-const otDate = t => OTD.get()[t.TicketID] || t.CreatedAt;
+// ວັນທີຂອງບິນຄ້າງ ເກັບໃນ Sheet (ຄໍລຳ CreatedAt) — ແກ້ໄຂໄດ້ ແລະ ເຫັນຄືກັນທຸກເຄື່ອງ
+const otDate = t => t.CreatedAt;
 const toLocalInput = d => { const x = new Date(d); return isNaN(x) ? '' : ymd(x) + 'T' + pad2(x.getHours()) + ':' + pad2(x.getMinutes()); };
 const dmy = d => { const y = ymd(d); return y ? y.split('-').reverse().join('/') : ''; };
 const tName = t => { const n = String(t.TicketName || t.CustomerName || '-'); return /^\d{4}-\d\d-\d\dT/.test(n) ? dmy(n) : n; };
@@ -762,7 +760,7 @@ const ticketPayload = () => ({ ticketId:cart.ticketId, ticketName:cart.ticketNam
 // ບັນທຶກບິນຄ້າງທີ່ກຳລັງແກ້ຢູ່ ໂດຍບໍ່ຖາມຊື່ (ໃຊ້ກ່ອນສະລັບໄປບິນອື່ນ)
 async function saveTicketSilently(){
   if(!cart.ticketId || !cart.items.length) return true;
-  const ok = await run(() => api('saveOpenTicket', ticketPayload())); if(ok && cart.date) OTD.set(cart.ticketId, cart.date); return !!ok;
+  return !!(await run(() => api('saveOpenTicket', ticketPayload())));
 }
 
 async function holdTicket(){
@@ -775,8 +773,6 @@ async function holdTicket(){
   const editing = !!cart.ticketId;
   const r = await run(() => api('saveOpenTicket', ticketPayload()), editing ? 'ບັນທຶກການແກ້ໄຂແລ້ວ' : 'ພັກບິນແລ້ວ');
   if(!r) return;
-  const sid = cart.ticketId || (r && (r.ticketId || r.TicketID));
-  if(sid && cart.date) OTD.set(sid, cart.date);
   if(!editing) clearCart();                 // ບິນທີ່ແກ້ຢູ່ ຈະຄ້າງໄວ້ໃຫ້ແກ້ຕໍ່ໄດ້
   updateOtCount();
 }
@@ -813,7 +809,7 @@ async function viewTicket(id){
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
   const t = r.ticket, items = r.items || [];
   const total = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
-  const dt = OTD.get()[id] || toLocalInput(t.CreatedAt);
+  const dt = toLocalInput(t.CreatedAt);
   $('#mBody').innerHTML = `
     <div class="grid g2" style="gap:0 14px">
       <label class="f">ຊື່ບິນ<input id="vName" value="${esc(tName(t) === '-' ? '' : (/^\\d{4}-\\d\\d-\\d\\dT/.test(String(t.TicketName)) ? '' : t.TicketName))}"></label>
@@ -832,7 +828,6 @@ async function viewTicket(id){
     const ok = await run(() => api('saveOpenTicket', { ticketId:id, ticketName:name, customerId:t.CustomerID || '', customerName:t.CustomerName || '',
       phone:String(t.Phone || ''), items, createdAt:date }), 'ບັນທຶກແລ້ວ');
     if(!ok) return;
-    OTD.set(id, date);
     if(cart.ticketId === id){ cart.ticketName = name; cart.date = date; renderTicket(); }
     await updateOtCount(); showOpenTickets();
   };
@@ -844,7 +839,7 @@ async function loadTicket(id){
   else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
   cart = { ...newCart(), ticketId:r.ticket.TicketID, ticketName:r.ticket.TicketName||'', customerId:r.ticket.CustomerID||'',
-    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[], date:OTD.get()[id] || '' };
+    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[], date:toLocalInput(r.ticket.CreatedAt) };
   closeModal();
   if(CUR !== 'pos') go('pos'); else { renderTicket(); updateOtCount(); }
   window.scrollTo({ top:0, behavior:'smooth' });
