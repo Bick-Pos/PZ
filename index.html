@@ -173,7 +173,9 @@ textarea{min-height:70px;resize:vertical}
 
     <!-- AI ASSISTANT -->
     <section class="view" id="v-ai">
-      <h1>ຜູ້ຊ່ວຍ AI</h1>
+      <div class="row"><h1>ຜູ້ຊ່ວຍ AI</h1><span class="spacer"></span>
+        <button class="btn sm" onclick="setAiKey()">🔑 ຕັ້ງ Gemini Key</button>
+        <button class="btn sm" onclick="aiHistory=[];renderAi()">ລ້າງແຊັດ</button></div>
       <div class="panel chatbox">
         <div class="chat-log" id="aiLog"></div>
         <div class="chat-suggest" id="aiSuggest">
@@ -402,8 +404,14 @@ async function refreshBase(){
 }
 
 /* ======================= AI ASSISTANT ======================= */
-let aiHistory = [];
+// ໜ້ານີ້ເອີ້ນ Gemini ໂດຍກົງຈາກ browser ແລະ ໃຊ້ຟັງຊັນຂໍ້ມູນເກົ່າຂອງເຈົ້າ (ບໍ່ຕ້ອງແກ້ Api.gs)
+const AI_MODEL = 'gemini-2.5-flash';   // ຖ້າ error "model not found" ໃຫ້ປ່ຽນຊື່ນີ້
+let aiHistory = [], aiCtx = null, aiCtxAt = 0;
 function loadAI(){ renderAi(); setTimeout(() => $('#aiInput') && $('#aiInput').focus(), 50); }
+function setAiKey(){
+  const k = prompt('ໃສ່ Gemini API Key (ເກັບໄວ້ໃນເຄື່ອງນີ້ເທົ່ານັ້ນ)', store.get('pos_gemini_key'));
+  if(k !== null){ store.set('pos_gemini_key', k.trim()); toast(k.trim() ? 'ບັນທຶກ Key ແລ້ວ' : 'ລຶບ Key ແລ້ວ'); }
+}
 function renderAi(){
   const log = $('#aiLog');
   log.innerHTML = aiHistory.length ? aiHistory.map(m => `<div class="bubble ${m.role}">${esc(m.text)}</div>`).join('')
@@ -411,20 +419,80 @@ function renderAi(){
   log.scrollTop = log.scrollHeight;
 }
 function askAiQuick(q){ $('#aiInput').value = q; sendAi(); }
+
+async function buildAiContext(q){
+  const g = (fn, ...a) => api(fn, ...a).catch(() => null);
+  if(!aiCtx || Date.now() - aiCtxAt > 60000){
+    const [dash, top, debtSum, customers, invoices, tx, b1, b2, b3] = await Promise.all([
+      g('getDashboardData'), g('getTopSellingProducts','monthly',10), g('getDebtSummary'), g('getCustomers'),
+      g('getInvoices'), g('getTransactions'), g('getDebtRecords'), g('debt2_getRecords'), g('debt3_getRecords')]);
+    const now = Date.now(), d7 = now - 7*864e5, d14 = now - 14*864e5;
+    let a = 0, b = 0, ac = 0, bc = 0;
+    (invoices || []).forEach(i => { const t = new Date(i.Date).getTime(); if(isNaN(t)) return; const m = Number(i.TotalAmount)||0;
+      if(t >= d7 && t <= now){ a += m; ac++; } else if(t >= d14 && t < d7){ b += m; bc++; } });
+    const by = {};
+    [].concat(b1||[], b2||[], b3||[]).forEach(d => { if(d.Status === 'Paid') return; const n = d.CustomerName || 'ບໍ່ລະບຸຊື່'; by[n] = (by[n]||0) + (Number(d.TotalAmount)||0); });
+    const byDate = (x, y) => new Date(y.Date) - new Date(x.Date);
+    aiCtx = {
+      ວັນທີປັດຈຸບັນ: new Date().toLocaleString('en-GB'),
+      ຍອດຂາຍ: dash && { ມື້ນີ້: dash.daily, ອາທິດນີ້: dash.weekly, ເດືອນນີ້: dash.monthly },
+      ທຽບອາທິດ: { ອາທິດນີ້_7ວັນຫຼ້າສຸດ: { ຍອດ: a, ຈຳນວນບິນ: ac }, ອາທິດແລ້ວ_7ວັນກ່ອນ: { ຍອດ: b, ຈຳນວນບິນ: bc }, ເປີເຊັນປ່ຽນ: b > 0 ? Math.round((a-b)/b*100) : null },
+      ໃບບິນຍັງບໍ່ຈ່າຍ: dash && { ຍອດ: dash.unpaidTotal, ຈຳນວນ: dash.unpaidCount },
+      ສິນຄ້າຂາຍດີເດືອນນີ້: top,
+      ສິນຄ້າໃກ້ໝົດ: ((dash && dash.lowStock) || []).map(p => ({ ຊື່: p.ProductName, ຄົງເຫຼືອ: p.CurrentStock, ຂັ້ນຕ່ຳ: p.MinStock })),
+      ໜີ້ລູກຄ້າ: { ຄ້າງທັງໝົດ: debtSum && debtSum.totalUnpaidAll, ຈຳນວນຄ້າງ: debtSum && debtSum.unpaidCountAll,
+        ຄ້າງຫຼາຍສຸດ_10ຄົນ: Object.keys(by).map(k => ({ ຊື່: k, ຍອດຄ້າງ: by[k] })).sort((x, y) => y.ຍອດຄ້າງ - x.ຍອດຄ້າງ).slice(0, 10) },
+      ລູກຄ້າຊື້ຫຼາຍສຸດ_8ຄົນ: (customers || []).map(c => ({ ຊື່: c.CustomerName, ຍອດຊື້ລວມ: Number(c.TotalSpent)||0, ຈຳນວນຄັ້ງ: Number(c.TotalOrders)||0 }))
+        .sort((x, y) => y.ຍອດຊື້ລວມ - x.ຍອດຊື້ລວມ).slice(0, 8),
+      ໃບບິນລ່າສຸດ_15ໃບ: (invoices || []).slice().sort(byDate).slice(0, 15).map(i => ({ ເລກບິນ: i.InvoiceNo, ວັນທີ: i.Date, ລູກຄ້າ: i.CustomerName || '-',
+        ຍອດ: Number(i.TotalAmount)||0, ຊຳລະ: i.PaymentMethod, ສະຖານະ: i.PaymentStatus })),
+      ສະຕັອກເຄື່ອນໄຫວລ່າສຸດ_15: (tx || []).slice().sort(byDate).slice(0, 15).map(t => ({ ວັນທີ: t.Date, ປະເພດ: t.Type === 'Stock In' ? 'ເຂົ້າ' : 'ອອກ',
+        ສິນຄ້າ: t.ProductName, ຈຳນວນ: t.Quantity, ໝາຍເຫດ: t.Note })),
+      _customers: customers || []
+    };
+    aiCtxAt = Date.now();
+  }
+  const { _customers, ...ctx } = aiCtx;
+  // ຖ້າຄຳຖາມມີຊື່ລູກຄ້າ → ດຶງປະຫວັດການຊື້ ແລະ ໜີ້ຂອງຄົນນັ້ນ
+  const m = _customers.find(c => String(c.CustomerName||'').trim().length > 2 && q.includes(String(c.CustomerName).trim()));
+  if(m){
+    const [h, d1, d2, d3] = await Promise.all([g('getCustomerOrderHistory', m.CustomerID), g('getCustomerDebtSummary', m.CustomerName),
+      g('debt2_getCustomerSummary', m.CustomerName), g('debt3_getCustomerSummary', m.CustomerName)]);
+    ctx['ລູກຄ້າທີ່ຖືກກ່າວເຖິງ'] = { ຊື່: m.CustomerName, ເບີໂທ: m.Phone, ຍອດຊື້ລວມ: Number(m.TotalSpent)||0, ຈຳນວນຄັ້ງຊື້: Number(m.TotalOrders)||0,
+      ປະຫວັດການຊື້ລ່າສຸດ: (h || []).slice(0, 10).map(x => ({ ວັນທີ: x.Date, ສິນຄ້າ: x.ProductName, ຈຳນວນ: x.Quantity, ລວມ: x.TotalPrice })),
+      ໜີ້_ປຶ້ມ1: d1, ໜີ້_ປຶ້ມ2: d2, ໜີ້_ປຶ້ມ3: d3 };
+  }
+  return ctx;
+}
+
+async function askGemini(q, history){
+  let key = store.get('pos_gemini_key');
+  if(!key){ setAiKey(); key = store.get('pos_gemini_key'); if(!key) throw new Error('ຍັງບໍ່ໄດ້ໃສ່ Gemini API Key'); }
+  const ctx = await buildAiContext(q);
+  const system = 'ເຈົ້າແມ່ນຜູ້ຊ່ວຍວິເຄາະທຸລະກິດຮ້ານຄ້າຂະໜາດນ້ອຍ (ລະບົບ POS). ຕອບເປັນພາສາລາວ ສັ້ນ ກະທັດຮັດ ຕົງປະເດັນ ' +
+    'ອີງຂໍ້ມູນ JSON ລຸ່ມນີ້ເທົ່ານັ້ນ ຢ່າແຕ່ງຕົວເລກ (ສະກຸນເງິນ ກີບ ₭). ຖ້າຂໍ້ມູນບໍ່ພໍໃຫ້ບອກວ່າບໍ່ມີຂໍ້ມູນ. ' +
+    'ຖ້າຖາມເຖິງລູກຄ້າສະເພາະຄົນ ໃຫ້ໃຊ້ "ລູກຄ້າທີ່ຖືກກ່າວເຖິງ". ຖ້າເໝາະສົມ ແນະນຳສິ່ງທີ່ຄວນເຮັດຕໍ່.\n\nຂໍ້ມູນຮ້ານ (JSON):\n' + JSON.stringify(ctx);
+  const contents = history.filter(m => m.text).map(m => ({ role: m.role === 'ai' ? 'model' : 'user', parts: [{ text: m.text }] }));
+  contents.push({ role: 'user', parts: [{ text: q }] });
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.3, maxOutputTokens: 1000 } }) });
+  const j = await res.json();
+  if(j.error) throw new Error('Gemini: ' + j.error.message);
+  const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+  return (parts ? parts.map(p => p.text || '').join('') : '') || 'AI ບໍ່ໄດ້ຕອບກັບ ລອງຖາມໃໝ່';
+}
+
 async function sendAi(){
   const box = $('#aiInput'), q = box.value.trim(); if(!q) return;
   box.value = '';
-  const historyForApi = aiHistory.slice(); // ບໍ່ລວມຂໍ້ຄວາມ "ກຳລັງວິເຄາະ..."
+  const historyForApi = aiHistory.filter(m => m.text !== 'ກຳລັງວິເຄາະ...' && !m.text.startsWith('ຜິດພາດ:')).slice(-10);
   aiHistory.push({ role:'user', text:q });
   aiHistory.push({ role:'ai', text:'ກຳລັງວິເຄາະ...' });
   renderAi();
   $('#aiSend').disabled = true;
-  try{
-    const r = await api('askShopAI', q, historyForApi);
-    aiHistory[aiHistory.length - 1] = { role:'ai', text: r.answer || 'ບໍ່ມີຄຳຕອບ' };
-  }catch(e){
-    aiHistory[aiHistory.length - 1] = { role:'ai', text: 'ຜິດພາດ: ' + e.message };
-  }
+  try{ aiHistory[aiHistory.length - 1] = { role:'ai', text: await askGemini(q, historyForApi) }; }
+  catch(e){ aiHistory[aiHistory.length - 1] = { role:'ai', text: 'ຜິດພາດ: ' + e.message }; }
   $('#aiSend').disabled = false; renderAi();
 }
 
