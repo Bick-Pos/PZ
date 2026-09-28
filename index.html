@@ -115,6 +115,9 @@ textarea{min-height:70px;resize:vertical}
 .ot-chip .s{font-size:12px;color:var(--muted)}
 .ot-chip .t{color:var(--jade);font-weight:700;font-size:14px}
 .ot-chip .d{position:absolute;top:4px;right:6px;background:none;border:0;color:var(--red);font-size:18px;cursor:pointer;line-height:1}
+.ot-day{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;padding:6px 10px;background:var(--gold-soft);border-radius:8px;font-size:14px}
+.ot-day:first-child{margin-top:0}
+.ot-chip .dt{font-size:11px;color:var(--gold);font-weight:600}
 .ot-chip.new{border-style:dashed;color:var(--jade);font-weight:600;min-width:90px;display:grid;place-items:center}
 
 /* ---------- AI ASSISTANT ---------- */
@@ -607,6 +610,13 @@ async function loadPos(){
 
 // ---- ແຖບບິນຄ້າງ (ສະແດງຢູ່ໜ້າຂາຍຕະຫຼອດ) ----
 let OT = [];
+// ວັນທີຂອງບິນຄ້າງ (ແກ້ໄຂໄດ້) — ເກັບໃນເຄື່ອງນີ້ + ສົ່ງ createdAt ໄປ Api.gs
+const OTD = { get(){ try{ return JSON.parse(store.get('pos_ot_dates') || '{}') }catch(e){ return {} } },
+  set(id, v){ if(!id) return; const m = OTD.get(); if(v) m[id] = v; else delete m[id]; store.set('pos_ot_dates', JSON.stringify(m)); } };
+const otDate = t => OTD.get()[t.TicketID] || t.CreatedAt;
+const toLocalInput = d => { const x = new Date(d); return isNaN(x) ? '' : ymd(x) + 'T' + pad2(x.getHours()) + ':' + pad2(x.getMinutes()); };
+const dmy = d => { const y = ymd(d); return y ? y.split('-').reverse().join('/') : ''; };
+const tName = t => { const n = String(t.TicketName || t.CustomerName || '-'); return /^\d{4}-\d\d-\d\dT/.test(n) ? dmy(n) : n; };
 async function updateOtCount(){
   try{ OT = await api('getOpenTickets'); }catch(e){ return; }
   $('#otCount').textContent = OT.length ? `(${OT.length})` : '';
@@ -617,7 +627,8 @@ function renderOtStrip(){
   el.innerHTML = `<div class="ot-chip new" onclick="newTicket()">+ ບິນໃໝ່</div>` + OT.map(t => `
     <div class="ot-chip ${t.TicketID === cart.ticketId ? 'active' : ''}" onclick="loadTicket('${esc(t.TicketID)}')">
       <button class="d" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')" aria-label="ລົບ">×</button>
-      <div class="n">${esc(t.TicketName || t.CustomerName || '-')}</div>
+      <div class="n">${esc(tName(t))}</div>
+      <div class="dt num">${dmy(otDate(t)).slice(0,5)}</div>
       <div class="s">${t.ItemCount} ລາຍການ</div>
       <div class="t num">${money(t.TotalAmount)}</div>
     </div>`).join('');
@@ -673,7 +684,7 @@ function renderTicket(){
   const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === cart.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
   $('#ticket').innerHTML = `
     <div class="head">
-      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(cart.ticketName || '') : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
+      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(/^\d{4}-\d\d-\d\dT/.test(cart.ticketName) ? dmy(cart.ticketName) : (cart.ticketName || '')) : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
         <button class="btn sm" onclick="clearCart()">ລ້າງ</button></div>
       <select class="inp" id="tCust" style="margin-top:10px"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select>
       <div class="row" style="margin-top:8px">
@@ -702,7 +713,8 @@ function renderTicket(){
       <label style="flex:1;font-size:12px;color:var(--muted)">ສົດ<input class="inp num" type="number" value="${esc(cart.cash)}" oninput="cart.cash=this.value;cart.transfer=Math.max(0,cartTotal()-(Number(this.value)||0));$('#tTr').value=cart.transfer" style="margin:0"></label>
       <label style="flex:1;font-size:12px;color:var(--muted)">ໂອນ<input id="tTr" class="inp num" type="number" value="${esc(cart.transfer)}" oninput="cart.transfer=this.value" style="margin:0"></label></div>` : ''}
     ${cart.pay !== 'Cash' && S.settings.QRCodeURL ? `<div style="text-align:center;margin-top:8px"><img src="${esc(S.settings.QRCodeURL)}" style="width:130px" alt="QR ຮັບເງິນໂອນ"></div>` : ''}
-    <div class="row" style="margin-top:8px">
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">ວັນທີ-ເວລາບິນ (ປ່ອຍຫວ່າງ = ຕອນນີ້ · ແກ້ໄດ້ຕະຫຼອດ)</div>
+    <div class="row" style="margin-top:4px">
       <input class="inp" type="datetime-local" value="${esc(cart.date)}" onchange="cart.date=this.value" title="ວັນທີຂາຍ (ປ່ອຍຫວ່າງ = ຕອນນີ້)" style="flex:1;margin:0">
       <button class="btn" onclick="signPad()">${cart.signature ? '✓ ເຊັນແລ້ວ' : 'ເຊັນຊື່'}</button>
     </div>
@@ -745,12 +757,12 @@ function signPad(){
 }
 
 const ticketPayload = () => ({ ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
-  customerName:cart.customerName, phone:cart.phone, items:cart.items });
+  customerName:cart.customerName, phone:cart.phone, items:cart.items, createdAt:cart.date || '' });
 
 // ບັນທຶກບິນຄ້າງທີ່ກຳລັງແກ້ຢູ່ ໂດຍບໍ່ຖາມຊື່ (ໃຊ້ກ່ອນສະລັບໄປບິນອື່ນ)
 async function saveTicketSilently(){
   if(!cart.ticketId || !cart.items.length) return true;
-  return !!(await run(() => api('saveOpenTicket', ticketPayload())));
+  const ok = await run(() => api('saveOpenTicket', ticketPayload())); if(ok && cart.date) OTD.set(cart.ticketId, cart.date); return !!ok;
 }
 
 async function holdTicket(){
@@ -763,6 +775,8 @@ async function holdTicket(){
   const editing = !!cart.ticketId;
   const r = await run(() => api('saveOpenTicket', ticketPayload()), editing ? 'ບັນທຶກການແກ້ໄຂແລ້ວ' : 'ພັກບິນແລ້ວ');
   if(!r) return;
+  const sid = cart.ticketId || (r && (r.ticketId || r.TicketID));
+  if(sid && cart.date) OTD.set(sid, cart.date);
   if(!editing) clearCart();                 // ບິນທີ່ແກ້ຢູ່ ຈະຄ້າງໄວ້ໃຫ້ແກ້ຕໍ່ໄດ້
   updateOtCount();
 }
@@ -776,12 +790,52 @@ async function newTicket(){
 async function showOpenTickets(){
   openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   const list = await run(() => api('getOpenTickets')); if(!list) return;
-  $('#mBody').innerHTML = list.length ? `<div class="tbl-wrap"><table><tr><th>ຊື່ບິນ</th><th>ເວລາ</th><th class="r">ຍອດ</th><th></th></tr>
-    ${list.map(t => `<tr><td><b>${esc(t.TicketName || '-')}</b><br><small>${esc(t.CustomerName || '')} ${t.ItemCount} ລາຍການ</small></td>
-      <td>${fmtDate(t.CreatedAt)}</td><td class="r num">${money(t.TotalAmount)}</td>
-      <td class="r"><button class="btn sm pri" onclick="loadTicket('${esc(t.TicketID)}')">ເປີດ</button>
-        <button class="btn sm danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`
-    : '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>';
+  OT = list; $('#otCount').textContent = list.length ? `(${list.length})` : ''; renderOtStrip();
+  if(!list.length){ $('#mBody').innerHTML = '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>'; return; }
+  const sorted = list.slice().sort((x, y) => new Date(otDate(y)) - new Date(otDate(x)));
+  const groups = {};
+  sorted.forEach(t => { const k = ymd(otDate(t)) || '-'; (groups[k] = groups[k] || []).push(t); });
+  $('#mBody').innerHTML = Object.keys(groups).sort().reverse().map(k => {
+    const g = groups[k], sum = g.reduce((s, t) => s + (Number(t.TotalAmount) || 0), 0);
+    return `<div class="ot-day"><b>📅 ${dmy(k) || 'ບໍ່ມີວັນທີ'}</b><span class="num">${g.length} ບິນ · ${money(sum)}</span></div>
+      <div class="tbl-wrap"><table>${g.map(t => `<tr>
+        <td><b>${esc(tName(t))}</b><br><small>${esc(t.CustomerName || '')} ${t.ItemCount} ລາຍການ · ${esc(toLocalInput(otDate(t)).slice(11))}</small></td>
+        <td class="r num">${money(t.TotalAmount)}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn sm" onclick="viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
+          <button class="btn sm pri" onclick="loadTicket('${esc(t.TicketID)}')">ແກ້ໄຂ</button>
+          <button class="btn sm danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`;
+  }).join('');
+}
+
+// ເບິ່ງບິນຄ້າງຄືນ + ແກ້ຊື່/ວັນທີ
+async function viewTicket(id){
+  openModal('ເບິ່ງບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+  const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
+  const t = r.ticket, items = r.items || [];
+  const total = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+  const dt = OTD.get()[id] || toLocalInput(t.CreatedAt);
+  $('#mBody').innerHTML = `
+    <div class="grid g2" style="gap:0 14px">
+      <label class="f">ຊື່ບິນ<input id="vName" value="${esc(tName(t) === '-' ? '' : (/^\\d{4}-\\d\\d-\\d\\dT/.test(String(t.TicketName)) ? '' : t.TicketName))}"></label>
+      <label class="f">ວັນທີ-ເວລາບິນ (ແກ້ໄດ້)<input id="vDate" type="datetime-local" value="${esc(dt)}"></label>
+    </div>
+    <small>${esc(t.CustomerName || 'ລູກຄ້າທົ່ວໄປ')} ${esc(t.Phone || '')}</small>
+    <div class="tbl-wrap"><table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
+      ${items.map(i => `<tr><td>${esc(i.productName)}</td><td class="r num">${esc(i.quantity)} ${esc(i.unit || '')}</td><td class="r num">${money(i.unitPrice)}</td>
+        <td class="r num">${money((Number(i.quantity) || 0) * (Number(i.unitPrice) || 0))}</td></tr>`).join('')}</table></div>
+    <div class="num" style="text-align:right;font-weight:700;font-size:18px;margin:10px 0">ລວມ ${money(total)}</div>
+    <div class="row"><button class="btn" onclick="showOpenTickets()">← ກັບຄືນ</button><span class="spacer"></span>
+      <button class="btn" id="vSave">ບັນທຶກຊື່/ວັນທີ</button>
+      <button class="btn pri" onclick="loadTicket('${esc(id)}')">ເປີດແກ້ໄຂບິນ</button></div>`;
+  $('#vSave').onclick = async () => {
+    const date = $('#vDate').value, name = $('#vName').value.trim();
+    const ok = await run(() => api('saveOpenTicket', { ticketId:id, ticketName:name, customerId:t.CustomerID || '', customerName:t.CustomerName || '',
+      phone:String(t.Phone || ''), items, createdAt:date }), 'ບັນທຶກແລ້ວ');
+    if(!ok) return;
+    OTD.set(id, date);
+    if(cart.ticketId === id){ cart.ticketName = name; cart.date = date; renderTicket(); }
+    await updateOtCount(); showOpenTickets();
+  };
 }
 
 async function loadTicket(id){
@@ -790,7 +844,7 @@ async function loadTicket(id){
   else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
   cart = { ...newCart(), ticketId:r.ticket.TicketID, ticketName:r.ticket.TicketName||'', customerId:r.ticket.CustomerID||'',
-    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[] };
+    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[], date:OTD.get()[id] || '' };
   closeModal();
   if(CUR !== 'pos') go('pos'); else { renderTicket(); updateOtCount(); }
   window.scrollTo({ top:0, behavior:'smooth' });
