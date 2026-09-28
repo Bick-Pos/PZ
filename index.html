@@ -420,47 +420,91 @@ function renderAi(){
 }
 function askAiQuick(q){ $('#aiInput').value = q; sendAi(); }
 
+const daysSince = d => {
+  const t = new Date(ymd(d) + 'T00:00:00').getTime();
+  return isNaN(t) ? null : Math.max(0, Math.round((new Date(today() + 'T00:00:00').getTime() - t) / 864e5));
+};
+
 async function buildAiContext(q){
   const g = (fn, ...a) => api(fn, ...a).catch(() => null);
-  if(!aiCtx || Date.now() - aiCtxAt > 60000){
-    const [dash, top, debtSum, customers, invoices, tx, b1, b2, b3] = await Promise.all([
-      g('getDashboardData'), g('getTopSellingProducts','monthly',10), g('getDebtSummary'), g('getCustomers'),
-      g('getInvoices'), g('getTransactions'), g('getDebtRecords'), g('debt2_getRecords'), g('debt3_getRecords')]);
+  const byDate = (x, y) => new Date(y.Date) - new Date(x.Date);
+  if(!aiCtx || Date.now() - aiCtxAt > 30000){
+    const [dash, top, customers, invoices, tx, products, b1, b2, b3] = await Promise.all([
+      g('getDashboardData'), g('getTopSellingProducts','monthly',10), g('getCustomers'),
+      g('getInvoices'), g('getTransactions'), g('getProducts'),
+      g('getDebtRecords'), g('debt2_getRecords'), g('debt3_getRecords')]);
+
+    // ---- ທຽບອາທິດ ----
     const now = Date.now(), d7 = now - 7*864e5, d14 = now - 14*864e5;
     let a = 0, b = 0, ac = 0, bc = 0;
     (invoices || []).forEach(i => { const t = new Date(i.Date).getTime(); if(isNaN(t)) return; const m = Number(i.TotalAmount)||0;
       if(t >= d7 && t <= now){ a += m; ac++; } else if(t >= d14 && t < d7){ b += m; bc++; } });
+
+    // ---- ສິນຄ້າ ແລະ ສະຕັອກ (ທຸກລາຍການ) ----
+    const prods = products || S.products || [];
+    const plist = prods.map(p => {
+      const st = Number(p.CurrentStock)||0, mn = Number(p.MinStock)||0;
+      return { ຊື່:p.ProductName, SKU:p.SKU, ປະເພດ:p.Category, ຄົງເຫຼືອ:st, ໜ່ວຍ:p.Unit, ຂັ້ນຕ່ຳ:mn,
+        ລາຄາຂາຍ:Number(p.SellingPrice)||0, ສະຖານະ: st <= 0 ? 'ໝົດ' : (st <= mn ? 'ໃກ້ໝົດ' : 'ພໍ') };
+    });
+    const stockValue = prods.reduce((s,p) => s + (Number(p.CostPrice)||0) * (Number(p.CurrentStock)||0), 0);
+
+    // ---- ໜີ້ ຈາກທັງ 3 ປຶ້ມ (ໂຄ້ດຄິດວັນ ແລະ ຍອດເອງ) ----
     const by = {};
-    [].concat(b1||[], b2||[], b3||[]).forEach(d => { if(d.Status === 'Paid') return; const n = d.CustomerName || 'ບໍ່ລະບຸຊື່'; by[n] = (by[n]||0) + (Number(d.TotalAmount)||0); });
-    const byDate = (x, y) => new Date(y.Date) - new Date(x.Date);
+    let unpaidAll = 0, unpaidCount = 0;
+    [[1,b1],[2,b2],[3,b3]].forEach(([book, arr]) => (arr || []).forEach(d => {
+      if(d.Status === 'Paid') return;
+      const name = String(d.CustomerName || 'ບໍ່ລະບຸຊື່').trim();
+      const days = daysSince(d.DateTaken), total = Number(d.TotalAmount)||0;
+      const c = by[name] || (by[name] = { ຊື່:name, ເບີໂທ:d.Phone || '', ຍອດຄ້າງລວມ:0, ຈຳນວນຄັ້ງທີ່ຄ້າງ:0, ຄ້າງມາດົນສຸດ_ວັນ:0, ລາຍການຄ້າງ:[] });
+      c.ຍອດຄ້າງລວມ += total; c.ຈຳນວນຄັ້ງທີ່ຄ້າງ++;
+      if(days !== null && days > c.ຄ້າງມາດົນສຸດ_ວັນ) c.ຄ້າງມາດົນສຸດ_ວັນ = days;
+      c.ລາຍການຄ້າງ.push({ ປຶ້ມໜີ້:book, ວັນທີເອົາເຄື່ອງ:ymd(d.DateTaken), ຄ້າງມາແລ້ວ_ວັນ:days, ຍອດ:total,
+        ເຄື່ອງທີ່ເອົາໄປ:(d.Items || []).map(i => ({ ຊື່:i.name, ລາຄາ:Number(i.price)||0 })), ໝາຍເຫດ:d.Note || '' });
+      unpaidAll += total; unpaidCount++;
+    }));
+    const debtors = Object.values(by).sort((x, y) => y.ຍອດຄ້າງລວມ - x.ຍອດຄ້າງລວມ);
+    debtors.forEach(c => c.ລາຍການຄ້າງ.sort((x, y) => String(x.ວັນທີເອົາເຄື່ອງ).localeCompare(String(y.ວັນທີເອົາເຄື່ອງ))));
+
     aiCtx = {
-      ວັນທີປັດຈຸບັນ: new Date().toLocaleString('en-GB'),
+      ວັນທີປັດຈຸບັນ: today(),
       ຍອດຂາຍ: dash && { ມື້ນີ້: dash.daily, ອາທິດນີ້: dash.weekly, ເດືອນນີ້: dash.monthly },
       ທຽບອາທິດ: { ອາທິດນີ້_7ວັນຫຼ້າສຸດ: { ຍອດ: a, ຈຳນວນບິນ: ac }, ອາທິດແລ້ວ_7ວັນກ່ອນ: { ຍອດ: b, ຈຳນວນບິນ: bc }, ເປີເຊັນປ່ຽນ: b > 0 ? Math.round((a-b)/b*100) : null },
       ໃບບິນຍັງບໍ່ຈ່າຍ: dash && { ຍອດ: dash.unpaidTotal, ຈຳນວນ: dash.unpaidCount },
       ສິນຄ້າຂາຍດີເດືອນນີ້: top,
-      ສິນຄ້າໃກ້ໝົດ: ((dash && dash.lowStock) || []).map(p => ({ ຊື່: p.ProductName, ຄົງເຫຼືອ: p.CurrentStock, ຂັ້ນຕ່ຳ: p.MinStock })),
-      ໜີ້ລູກຄ້າ: { ຄ້າງທັງໝົດ: debtSum && debtSum.totalUnpaidAll, ຈຳນວນຄ້າງ: debtSum && debtSum.unpaidCountAll,
-        ຄ້າງຫຼາຍສຸດ_10ຄົນ: Object.keys(by).map(k => ({ ຊື່: k, ຍອດຄ້າງ: by[k] })).sort((x, y) => y.ຍອດຄ້າງ - x.ຍອດຄ້າງ).slice(0, 10) },
+      ສະຫຼຸບສະຕັອກ: { ຈຳນວນສິນຄ້າທັງໝົດ: plist.length, ໝົດ: plist.filter(p => p.ສະຖານະ === 'ໝົດ').length,
+        ໃກ້ໝົດ: plist.filter(p => p.ສະຖານະ === 'ໃກ້ໝົດ').length, ມູນຄ່າສະຕັອກ_ລາຄາທຶນ: stockValue },
+      ສິນຄ້າທັງໝົດ_ແລະ_ຄົງເຫຼືອ: plist,
+      ໜີ້ລູກຄ້າ: { ຍອດຄ້າງທັງໝົດ: unpaidAll, ຈຳນວນຄັ້ງທີ່ຄ້າງ: unpaidCount, ຈຳນວນລູກຄ້າທີ່ຄ້າງ: debtors.length, ລາຍຊື່ລູກຄ້າທີ່ຄ້າງ: debtors },
       ລູກຄ້າຊື້ຫຼາຍສຸດ_8ຄົນ: (customers || []).map(c => ({ ຊື່: c.CustomerName, ຍອດຊື້ລວມ: Number(c.TotalSpent)||0, ຈຳນວນຄັ້ງ: Number(c.TotalOrders)||0 }))
         .sort((x, y) => y.ຍອດຊື້ລວມ - x.ຍອດຊື້ລວມ).slice(0, 8),
       ໃບບິນລ່າສຸດ_15ໃບ: (invoices || []).slice().sort(byDate).slice(0, 15).map(i => ({ ເລກບິນ: i.InvoiceNo, ວັນທີ: i.Date, ລູກຄ້າ: i.CustomerName || '-',
         ຍອດ: Number(i.TotalAmount)||0, ຊຳລະ: i.PaymentMethod, ສະຖານະ: i.PaymentStatus })),
-      ສະຕັອກເຄື່ອນໄຫວລ່າສຸດ_15: (tx || []).slice().sort(byDate).slice(0, 15).map(t => ({ ວັນທີ: t.Date, ປະເພດ: t.Type === 'Stock In' ? 'ເຂົ້າ' : 'ອອກ',
-        ສິນຄ້າ: t.ProductName, ຈຳນວນ: t.Quantity, ໝາຍເຫດ: t.Note })),
-      _customers: customers || []
+      _customers: customers || [], _tx: tx || [], _products: prods
     };
     aiCtxAt = Date.now();
   }
-  const { _customers, ...ctx } = aiCtx;
-  // ຖ້າຄຳຖາມມີຊື່ລູກຄ້າ → ດຶງປະຫວັດການຊື້ ແລະ ໜີ້ຂອງຄົນນັ້ນ
-  const m = _customers.find(c => String(c.CustomerName||'').trim().length > 2 && q.includes(String(c.CustomerName).trim()));
+  const { _customers, _tx, _products, ...ctx } = aiCtx;
+  const ql = q.toLowerCase();
+
+  // ຖ້າຄຳຖາມມີຊື່ສິນຄ້າ → ເພີ່ມລາຍລະອຽດ ແລະ ປະຫວັດເຂົ້າ-ອອກສະຕັອກ
+  const pm = _products.filter(p => { const n = String(p.ProductName || '').trim().toLowerCase(), s = String(p.SKU || '').trim().toLowerCase();
+    return (n.length > 1 && ql.includes(n)) || (s.length > 2 && ql.includes(s)); }).slice(0, 5);
+  if(pm.length) ctx['ສິນຄ້າທີ່ຖືກກ່າວເຖິງ'] = pm.map(p => {
+    const mv = _tx.filter(t => String(t.ProductID) === String(p.ProductID)).sort(byDate);
+    const sum = ty => mv.filter(t => t.Type === ty).reduce((s, t) => s + (Number(t.Quantity)||0), 0);
+    return { ຊື່: p.ProductName, ຄົງເຫຼືອ: Number(p.CurrentStock)||0, ໜ່ວຍ: p.Unit, ຂັ້ນຕ່ຳ: Number(p.MinStock)||0,
+      ລາຄາທຶນ: Number(p.CostPrice)||0, ລາຄາຂາຍ: Number(p.SellingPrice)||0,
+      ບັນທຶກເຂົ້າລວມ: sum('Stock In'), ບັນທຶກອອກລວມ: sum('Stock Out'),
+      ການເຄື່ອນໄຫວລ່າສຸດ_20: mv.slice(0, 20).map(t => ({ ວັນທີ: ymd(t.Date), ປະເພດ: t.Type === 'Stock In' ? 'ເຂົ້າ' : 'ອອກ', ຈຳນວນ: t.Quantity, ໝາຍເຫດ: t.Note })) };
+  });
+
+  // ຖ້າຄຳຖາມມີຊື່ລູກຄ້າ → ເພີ່ມປະຫວັດການຊື້
+  const m = _customers.find(c => String(c.CustomerName || '').trim().length > 2 && q.includes(String(c.CustomerName).trim()));
   if(m){
-    const [h, d1, d2, d3] = await Promise.all([g('getCustomerOrderHistory', m.CustomerID), g('getCustomerDebtSummary', m.CustomerName),
-      g('debt2_getCustomerSummary', m.CustomerName), g('debt3_getCustomerSummary', m.CustomerName)]);
+    const h = await g('getCustomerOrderHistory', m.CustomerID);
     ctx['ລູກຄ້າທີ່ຖືກກ່າວເຖິງ'] = { ຊື່: m.CustomerName, ເບີໂທ: m.Phone, ຍອດຊື້ລວມ: Number(m.TotalSpent)||0, ຈຳນວນຄັ້ງຊື້: Number(m.TotalOrders)||0,
-      ປະຫວັດການຊື້ລ່າສຸດ: (h || []).slice(0, 10).map(x => ({ ວັນທີ: x.Date, ສິນຄ້າ: x.ProductName, ຈຳນວນ: x.Quantity, ລວມ: x.TotalPrice })),
-      ໜີ້_ປຶ້ມ1: d1, ໜີ້_ປຶ້ມ2: d2, ໜີ້_ປຶ້ມ3: d3 };
+      ປະຫວັດການຊື້ລ່າສຸດ: (h || []).slice(0, 15).map(x => ({ ວັນທີ: x.Date, ສິນຄ້າ: x.ProductName, ຈຳນວນ: x.Quantity, ລວມ: x.TotalPrice })) };
   }
   return ctx;
 }
@@ -469,20 +513,25 @@ async function askGemini(q, history){
   let key = store.get('pos_gemini_key');
   if(!key){ setAiKey(); key = store.get('pos_gemini_key'); if(!key) throw new Error('ຍັງບໍ່ໄດ້ໃສ່ Gemini API Key'); }
   const ctx = await buildAiContext(q);
-  const system = 'ເຈົ້າແມ່ນຜູ້ຊ່ວຍວິເຄາະທຸລະກິດຮ້ານຄ້າຂະໜາດນ້ອຍ (ລະບົບ POS). ຕອບເປັນພາສາລາວ ສັ້ນ ກະທັດຮັດ ຕົງປະເດັນ ' +
-    'ອີງຂໍ້ມູນ JSON ລຸ່ມນີ້ເທົ່ານັ້ນ ຢ່າແຕ່ງຕົວເລກ (ສະກຸນເງິນ ກີບ ₭). ຖ້າຂໍ້ມູນບໍ່ພໍໃຫ້ບອກວ່າບໍ່ມີຂໍ້ມູນ. ' +
-    'ຖ້າຖາມເຖິງລູກຄ້າສະເພາະຄົນ ໃຫ້ໃຊ້ "ລູກຄ້າທີ່ຖືກກ່າວເຖິງ". ຖ້າເໝາະສົມ ແນະນຳສິ່ງທີ່ຄວນເຮັດຕໍ່.\n\nຂໍ້ມູນຮ້ານ (JSON):\n' + JSON.stringify(ctx);
+  const system =
+    'ເຈົ້າແມ່ນຜູ້ຊ່ວຍຂອງຮ້ານຄ້າ (ລະບົບ POS). ຕອບເປັນພາສາລາວ ຊັດເຈນ ຄົບຖ້ວນ. ສະກຸນເງິນ ກີບ (₭) ໃສ່ຈຸດຂັ້ນຫຼັກພັນ.\n' +
+    'ກົດເຫຼັກ:\n' +
+    '1) ໃຊ້ຕົວເລກຈາກ JSON ຕາມທີ່ມີເທົ່ານັ້ນ ຫ້າມເດົາ ຫ້າມແຕ່ງ ຫ້າມປັດເສດ. ຄ່າ "ຄ້າງມາແລ້ວ_ວັນ", "ຍອດຄ້າງລວມ", "ຄົງເຫຼືອ" ຖືກຄິດໄວ້ແລ້ວ ໃຫ້ນຳໃຊ້ໂດຍກົງ.\n' +
+    '2) ຖ້າຖາມສະຕັອກຂອງສິນຄ້າໃດ ໃຫ້ຫາຈາກ "ສິນຄ້າທັງໝົດ_ແລະ_ຄົງເຫຼືອ" ແລ້ວບອກ ຊື່ + ຄົງເຫຼືອ + ໜ່ວຍ + ສະຖານະ. ຖ້າຖາມ "ທັງໝົດ" ຫຼື "ທຸກລາຍການ" ໃຫ້ລະບຸຄົບທຸກລາຍການ ຫ້າມຕັດ. ຖ້າບໍ່ພົບຊື່ ໃຫ້ບອກວ່າບໍ່ພົບ ແລະແນະນຳຊື່ທີ່ໃກ້ຄຽງ.\n' +
+    '3) ຖ້າຖາມໜີ້ຂອງລູກຄ້າ ໃຫ້ຫາຈາກ "ໜີ້ລູກຄ້າ.ລາຍຊື່ລູກຄ້າທີ່ຄ້າງ" ແລ້ວບອກ: ຍອດຄ້າງລວມ, ຄ້າງມາດົນສຸດຈັກວັນ, ແລະລາຍການແຕ່ລະຄັ້ງຕາມວັນທີ (ວັນທີເອົາເຄື່ອງ, ຄ້າງມາຈັກວັນ, ເຄື່ອງທີ່ເອົາໄປ ພ້ອມລາຄາ, ຍອດຂອງຄັ້ງນັ້ນ). ຖ້າຊື່ບໍ່ຢູ່ໃນລາຍຊື່ ໃຫ້ບອກວ່າລູກຄ້ານີ້ບໍ່ມີໜີ້ຄ້າງ.\n' +
+    '4) ຖ້າຂໍ້ມູນບໍ່ພໍຕອບ ໃຫ້ບອກຕົງໆວ່າບໍ່ມີຂໍ້ມູນ.\n' +
+    '5) ຫ້າມໃຊ້ຮູບແບບ markdown (ຫ້າມ ** ຫຼື # ຫຼື |). ໃຫ້ໃຊ້ຂໍ້ຄວາມທຳມະດາ ແລະຂີດ - ນຳໜ້າແຕ່ລະລາຍການ ແຍກແຖວໃຫ້ອ່ານງ່າຍ.\n\n' +
+    'ຂໍ້ມູນຮ້ານ (JSON):\n' + JSON.stringify(ctx);
   const contents = history.filter(m => m.text).map(m => ({ role: m.role === 'ai' ? 'model' : 'user', parts: [{ text: m.text }] }));
   contents.push({ role: 'user', parts: [{ text: q }] });
   const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent', {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { temperature: 0.3, maxOutputTokens: 1000 } }) });
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { maxOutputTokens: 4000 } }) });
   const j = await res.json();
   if(j.error) throw new Error('Gemini: ' + j.error.message);
   const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
   return (parts ? parts.map(p => p.text || '').join('') : '') || 'AI ບໍ່ໄດ້ຕອບກັບ ລອງຖາມໃໝ່';
 }
-
 async function sendAi(){
   const box = $('#aiInput'), q = box.value.trim(); if(!q) return;
   box.value = '';
