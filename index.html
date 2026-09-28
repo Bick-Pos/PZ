@@ -105,6 +105,18 @@ textarea{min-height:70px;resize:vertical}
 .ticket .total{display:flex;justify-content:space-between;font-size:22px;font-weight:700;padding:12px 0;border-top:2px dashed var(--line);margin-top:8px}
 .ticket .lines{max-height:40vh;overflow:auto}
 
+/* ---------- open tickets strip ---------- */
+.ot-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 12px;margin-bottom:6px;-webkit-overflow-scrolling:touch}
+.ot-chip{flex:0 0 auto;min-width:150px;max-width:220px;background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--radius);padding:8px 10px;cursor:pointer;text-align:left;position:relative}
+.ot-chip:hover{border-color:var(--jade)}
+.ot-chip.active{border-color:var(--jade);background:var(--jade-soft);box-shadow:0 0 0 1px var(--jade) inset}
+.ot-chip .n{font-weight:600;font-size:14px;padding-right:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ot-chip .s{font-size:12px;color:var(--muted)}
+.ot-chip .t{color:var(--jade);font-weight:700;font-size:14px}
+.ot-chip .d{position:absolute;top:4px;right:6px;background:none;border:0;color:var(--red);font-size:18px;cursor:pointer;line-height:1}
+.ot-chip.new{border-style:dashed;color:var(--jade);font-weight:600;min-width:90px;display:grid;place-items:center}
+
 /* ---------- AI ASSISTANT ---------- */
 .chatbox{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:420px}
 .chat-log{flex:1;overflow-y:auto;padding:6px 2px;display:flex;flex-direction:column;gap:10px}
@@ -142,7 +154,8 @@ textarea{min-height:70px;resize:vertical}
   nav.side button{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;min-width:64px;align-items:center;text-align:center}
   nav.side .ico{font-size:18px}
   .pos{grid-template-columns:1fr}
-  .ticket{position:static}
+  .ticket{position:static;order:-1}      /* ບິນໃໝ່ຂຶ້ນເທິງສຸດໃນມືຖື */
+  .ticket .lines{max-height:26vh}        /* ລາຍການໃນບິນເລື່ອນໄດ້ ບໍ່ດັນຊ່ອງຄົ້ນຫາລົງໄກ */
   .chatbox{height:calc(100vh - 250px)}
   main{padding-bottom:110px}
 }
@@ -195,6 +208,7 @@ textarea{min-height:70px;resize:vertical}
 
     <!-- POS -->
     <section class="view" id="v-pos">
+      <div class="ot-strip" id="otStrip"></div>
       <div class="pos">
         <div>
           <div class="row" style="margin-bottom:14px">
@@ -590,7 +604,25 @@ async function loadPos(){
   S.settings = st;
   renderPosGrid(); renderTicket(); updateOtCount();
 }
-async function updateOtCount(){ try{ const t = await api('getOpenTickets'); $('#otCount').textContent = t.length ? `(${t.length})` : ''; }catch(e){} }
+
+// ---- ແຖບບິນຄ້າງ (ສະແດງຢູ່ໜ້າຂາຍຕະຫຼອດ) ----
+let OT = [];
+async function updateOtCount(){
+  try{ OT = await api('getOpenTickets'); }catch(e){ return; }
+  $('#otCount').textContent = OT.length ? `(${OT.length})` : '';
+  renderOtStrip();
+}
+function renderOtStrip(){
+  const el = $('#otStrip'); if(!el) return;
+  el.innerHTML = `<div class="ot-chip new" onclick="newTicket()">+ ບິນໃໝ່</div>` + OT.map(t => `
+    <div class="ot-chip ${t.TicketID === cart.ticketId ? 'active' : ''}" onclick="loadTicket('${esc(t.TicketID)}')">
+      <button class="d" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')" aria-label="ລົບ">×</button>
+      <div class="n">${esc(t.TicketName || t.CustomerName || '-')}</div>
+      <div class="s">${t.ItemCount} ລາຍການ</div>
+      <div class="t num">${money(t.TotalAmount)}</div>
+    </div>`).join('');
+}
+
 function posList(){
   const q = $('#posSearch').value.trim().toLowerCase();
   return S.products.filter(p => !q || String(p.ProductName).toLowerCase().includes(q) || String(p.SKU).toLowerCase().includes(q));
@@ -676,11 +708,12 @@ function renderTicket(){
     </div>
     <input class="inp" placeholder="ໝາຍເຫດ" value="${esc(cart.note)}" oninput="cart.note=this.value" style="margin-top:8px">
     <div class="row" style="margin-top:12px">
-      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>ພັກບິນ</button>
+      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>${cart.ticketId ? 'ບັນທຶກແກ້ໄຂ' : 'ພັກບິນ'}</button>
       <button class="btn pri" style="flex:2" id="btnCheckout" onclick="checkout()" ${cart.items.length ? '' : 'disabled'}>ຮັບເງິນ ${money(total)}</button>
     </div>`;
   $('#tCust').onchange = e => { const c = S.customers.find(x => x.CustomerID === e.target.value);
     cart.customerId = e.target.value; cart.customerName = c ? c.CustomerName : ''; cart.phone = c ? String(c.Phone||'') : ''; renderTicket(); };
+  renderOtStrip();
   updChange();
 }
 function updChange(){
@@ -711,14 +744,35 @@ function signPad(){
   };
 }
 
-async function holdTicket(){
-  const name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', cart.ticketName || cart.customerName || '');
-  if(name === null) return;
-  cart.ticketName = name;
-  const r = await run(() => api('saveOpenTicket', { ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
-    customerName:cart.customerName, phone:cart.phone, items:cart.items }), 'ພັກບິນແລ້ວ');
-  if(r){ clearCart(); updateOtCount(); }
+const ticketPayload = () => ({ ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
+  customerName:cart.customerName, phone:cart.phone, items:cart.items });
+
+// ບັນທຶກບິນຄ້າງທີ່ກຳລັງແກ້ຢູ່ ໂດຍບໍ່ຖາມຊື່ (ໃຊ້ກ່ອນສະລັບໄປບິນອື່ນ)
+async function saveTicketSilently(){
+  if(!cart.ticketId || !cart.items.length) return true;
+  return !!(await run(() => api('saveOpenTicket', ticketPayload())));
 }
+
+async function holdTicket(){
+  let name = cart.ticketName || cart.customerName || '';
+  if(!cart.ticketId){                       // ບິນໃໝ່ → ຖາມຊື່
+    name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', name);
+    if(name === null) return;
+  }
+  cart.ticketName = name;
+  const editing = !!cart.ticketId;
+  const r = await run(() => api('saveOpenTicket', ticketPayload()), editing ? 'ບັນທຶກການແກ້ໄຂແລ້ວ' : 'ພັກບິນແລ້ວ');
+  if(!r) return;
+  if(!editing) clearCart();                 // ບິນທີ່ແກ້ຢູ່ ຈະຄ້າງໄວ້ໃຫ້ແກ້ຕໍ່ໄດ້
+  updateOtCount();
+}
+
+async function newTicket(){
+  if(cart.ticketId){ if(!await saveTicketSilently()) return; }
+  else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເລີ່ມບິນໃໝ່ ແລະ ລ້າງບິນນີ້?')) return;
+  clearCart(); updateOtCount();
+}
+
 async function showOpenTickets(){
   openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   const list = await run(() => api('getOpenTickets')); if(!list) return;
@@ -729,15 +783,27 @@ async function showOpenTickets(){
         <button class="btn sm danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`
     : '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>';
 }
+
 async function loadTicket(id){
-  if(cart.items.length && !cart.ticketId && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
+  if(id === cart.ticketId){ closeModal(); return; }
+  if(cart.ticketId){ if(!await saveTicketSilently()) return; }   // ບັນທຶກບິນເກົ່າອັດຕະໂນມັດ
+  else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
   cart = { ...newCart(), ticketId:r.ticket.TicketID, ticketName:r.ticket.TicketName||'', customerId:r.ticket.CustomerID||'',
     customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[] };
-  closeModal(); if(CUR !== 'pos') go('pos'); else renderTicket();
+  closeModal();
+  if(CUR !== 'pos') go('pos'); else { renderTicket(); updateOtCount(); }
+  window.scrollTo({ top:0, behavior:'smooth' });
 }
-async function delTicket(id){ if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
-  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){ showOpenTickets(); updateOtCount(); } }
+
+async function delTicket(id){
+  if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
+  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){
+    if(cart.ticketId === id) cart = newCart();
+    await updateOtCount(); renderTicket();
+    if($('#modalBg').classList.contains('open')) showOpenTickets();
+  }
+}
 
 async function checkout(){
   const total = cartTotal();
