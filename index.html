@@ -405,7 +405,7 @@ async function refreshBase(){
 
 /* ======================= AI ASSISTANT ======================= */
 // ໜ້ານີ້ເອີ້ນ Gemini ໂດຍກົງຈາກ browser ແລະ ໃຊ້ຟັງຊັນຂໍ້ມູນເກົ່າຂອງເຈົ້າ (ບໍ່ຕ້ອງແກ້ Api.gs)
-const AI_MODEL = 'gemini-2.5-flash';   // ຖ້າ error "model not found" ໃຫ້ປ່ຽນຊື່ນີ້
+const AI_MODEL = 'gemini-3-flash-preview';   // ຖ້າ error "model not found" ໃຫ້ປ່ຽນຊື່ນີ້
 let aiHistory = [], aiCtx = null, aiCtxAt = 0;
 function loadAI(){ renderAi(); setTimeout(() => $('#aiInput') && $('#aiInput').focus(), 50); }
 function setAiKey(){
