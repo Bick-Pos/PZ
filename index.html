@@ -749,12 +749,34 @@ async function stockForm(txId, presetPid){
   const opts = S.products.map(p => `<option value="${esc(p.ProductID)}" ${p.ProductID === t.ProductID ? 'selected' : ''}>${esc(p.ProductName)} (ເຫຼືອ ${p.CurrentStock})</option>`).join('');
   openModal(txId ? 'ແກ້ໄຂລາຍການສະຕັອກ' : 'ບັນທຶກເຂົ້າ-ອອກສະຕັອກ', `
     <label class="f">ປະເພດ<select id="xType">${opt('Stock In','ເຂົ້າ (ຮັບເຄື່ອງ)',t.Type)}${opt('Stock Out','ອອກ (ເສຍ, ໝົດອາຍຸ, ເອົາໄປໃຊ້)',t.Type)}</select></label>
-    <label class="f">ສິນຄ້າ<select id="xProd">${opts}</select></label>
+ <label class="f">ສິນຄ້າ<input id="xSearch" placeholder="ພິມຊື່ສິນຄ້າ ຫຼື SKU..." autocomplete="off"></label>
+<div id="xPick" style="font-size:13px;color:var(--jade);font-weight:600;margin:-4px 0 6px"></div>
+<div id="xList" style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:12px"></div>
+<input type="hidden" id="xProd" value="${esc(t.ProductID || '')}">
     <label class="f">ຈຳນວນ<input id="xQty" type="number" step="any" value="${esc(t.Quantity ?? '')}"></label>
     <label class="f">ວັນທີ<input id="xDate" type="date" value="${t.Date ? ymd(t.Date) : today()}"></label>
     <label class="f">ໝາຍເຫດ<input id="xNote" value="${esc(t.Note)}"></label>
     <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="xSave">ບັນທຶກ</button></div>`);
-  setTimeout(() => $('#xQty').focus(), 50);
+const drawX = () => {
+  const q = $('#xSearch').value.trim().toLowerCase(), cur = String($('#xProd').value);
+  const l = S.products.filter(p => !q || (String(p.ProductName) + ' ' + String(p.SKU)).toLowerCase().includes(q));
+  const sel = S.products.find(p => String(p.ProductID) === cur);
+  $('#xPick').textContent = sel ? '✓ ເລືອກ: ' + sel.ProductName : '';
+  $('#xList').innerHTML = l.length ? l.map(p => `<div data-id="${esc(p.ProductID)}" style="padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--line);${String(p.ProductID) === cur ? 'background:var(--jade-soft);font-weight:600' : ''}">
+    ${esc(p.ProductName)} <small style="color:var(--muted)">${esc(p.SKU || '')} · ເຫຼືອ ${esc(p.CurrentStock)} ${esc(p.Unit || '')}</small></div>`).join('')
+    : '<div class="empty">ບໍ່ພົບສິນຄ້າ</div>';
+};
+$('#xSearch').oninput = drawX;
+$('#xSearch').onkeydown = e => {              // ກົດ Enter = ເລືອກອັນທຳອິດທີ່ຂຶ້ນ
+  if(e.key !== 'Enter') return; e.preventDefault();
+  const f = $('#xList [data-id]'); if(f) f.click();
+};
+$('#xList').onclick = e => {
+  const d = e.target.closest('[data-id]'); if(!d) return;
+  $('#xProd').value = d.dataset.id; drawX(); $('#xQty').focus();
+};
+drawX();
+setTimeout(() => (t.ProductID ? $('#xQty') : $('#xSearch')).focus(), 50);
   $('#xSave').onclick = async () => {
     const d = { txId, type:$('#xType').value, productId:$('#xProd').value, quantity:$('#xQty').value, date:$('#xDate').value, note:$('#xNote').value };
     if(!d.productId) return toast('ກະລຸນາເລືອກສິນຄ້າ', true);
