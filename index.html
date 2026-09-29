@@ -1076,5 +1076,53 @@ else { go(store.get('pos_view') || 'dash'); applyBrand(); }
   }
 })();
 </script>
+<script>
+(function(){
+  const norm = s => String(s ?? '').normalize('NFC').toLowerCase()
+    .replace(/\u0EAB\u0E99/g, '\u0EDC').replace(/\u0EAB\u0EA1/g, '\u0EDD').replace(/[\u200B-\u200D\uFEFF\s]+/g, ' ').trim();
+
+  window.filteredTx = function(){
+    const ty = $('#sxType').value, q = norm($('#sxSearch').value), from = $('#sxFrom').value, to = $('#sxTo').value;
+    return TX.filter(t => (ty === 'all' || t.Type === ty) && (!q || norm(t.ProductName + ' ' + t.Note).includes(q)) && inRange(t.Date, from, to));
+  };
+
+  window.stockForm = async function(txId, presetPid){
+    if(!S.products.length) await refreshBase();
+    const t = TX.find(x => x.TxID === txId) || { Type:'Stock In', ProductID:presetPid };
+    openModal(txId ? 'ແກ້ໄຂລາຍການສະຕັອກ' : 'ບັນທຶກເຂົ້າ-ອອກສະຕັອກ', `
+      <label class="f">ປະເພດ<select id="xType">${opt('Stock In','ເຂົ້າ (ຮັບເຄື່ອງ)',t.Type)}${opt('Stock Out','ອອກ (ເສຍ, ໝົດອາຍຸ, ເອົາໄປໃຊ້)',t.Type)}</select></label>
+      <label class="f">ສິນຄ້າ (ພິມຊື່ ຫຼື ລະຫັດ)<input id="xSearch" placeholder="ພິມຊື່ສິນຄ້າ ຫຼື SKU..." autocomplete="off"></label>
+      <div id="xPick" style="font-size:14px;color:var(--jade);font-weight:600;margin:-4px 0 6px"></div>
+      <div id="xList" style="max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:12px"></div>
+      <input type="hidden" id="xProd" value="${esc(t.ProductID || '')}">
+      <label class="f">ຈຳນວນ<input id="xQty" type="number" step="any" value="${esc(t.Quantity ?? '')}"></label>
+      <label class="f">ວັນທີ<input id="xDate" type="date" value="${t.Date ? ymd(t.Date) : today()}"></label>
+      <label class="f">ໝາຍເຫດ<input id="xNote" value="${esc(t.Note)}"></label>
+      <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="xSave">ບັນທຶກ</button></div>`);
+    const draw = () => {
+      const q = norm($('#xSearch').value), cur = String($('#xProd').value);
+      const all = S.products.filter(p => !q || norm(p.ProductName + ' ' + p.SKU).includes(q));
+      const l = all.slice(0, 60), sel = S.products.find(p => String(p.ProductID) === cur);
+      $('#xPick').textContent = sel ? '✓ ເລືອກແລ້ວ: ' + sel.ProductName + ' (ເຫຼືອ ' + sel.CurrentStock + ' ' + (sel.Unit || '') + ')' : '';
+      $('#xList').innerHTML = l.length ? l.map(p => `<div data-id="${esc(p.ProductID)}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);${String(p.ProductID) === cur ? 'background:var(--jade-soft);font-weight:600' : ''}">
+        ${esc(p.ProductName)}<br><small style="color:var(--muted)">${esc(p.SKU || '-')} · ເຫຼືອ ${esc(p.CurrentStock)} ${esc(p.Unit || '')}</small></div>`).join('')
+        + (all.length > 60 ? `<div class="empty">ສະແດງ 60 ຈາກ ${all.length} ລາຍການ — ພິມເພີ່ມເພື່ອກອງ</div>` : '')
+        : '<div class="empty">ບໍ່ພົບສິນຄ້າ</div>';
+    };
+    $('#xSearch').oninput = draw;
+    $('#xSearch').onkeydown = e => { if(e.key !== 'Enter') return; e.preventDefault(); const f = $('#xList [data-id]'); if(f) f.click(); };
+    $('#xList').onclick = e => { const d = e.target.closest('[data-id]'); if(!d) return; $('#xProd').value = d.dataset.id; draw(); $('#xQty').focus(); };
+    draw();
+    setTimeout(() => (t.ProductID ? $('#xQty') : $('#xSearch')).focus(), 50);
+    $('#xSave').onclick = async () => {
+      const d = { txId, type:$('#xType').value, productId:$('#xProd').value, quantity:$('#xQty').value, date:$('#xDate').value, note:$('#xNote').value };
+      if(!d.productId) return toast('ກະລຸນາເລືອກສິນຄ້າ (ແຕະລາຍການສິນຄ້າກ່ອນ)', true);
+      $('#xSave').disabled = true;
+      if(await run(() => api(txId ? 'updateStockTransaction' : 'recordStockTransaction', d), 'ບັນທຶກແລ້ວ')){ closeModal(); reloadActive(); }
+      else $('#xSave').disabled = false;
+    };
+  };
+})();
+</script>
 </body>
 </html>
