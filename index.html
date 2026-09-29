@@ -105,21 +105,6 @@ textarea{min-height:70px;resize:vertical}
 .ticket .total{display:flex;justify-content:space-between;font-size:22px;font-weight:700;padding:12px 0;border-top:2px dashed var(--line);margin-top:8px}
 .ticket .lines{max-height:40vh;overflow:auto}
 
-/* ---------- open tickets strip ---------- */
-.ot-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 12px;margin-bottom:6px;-webkit-overflow-scrolling:touch}
-.ot-chip{flex:0 0 auto;min-width:150px;max-width:220px;background:var(--paper);border:1px solid var(--line);
-  border-radius:var(--radius);padding:8px 10px;cursor:pointer;text-align:left;position:relative}
-.ot-chip:hover{border-color:var(--jade)}
-.ot-chip.active{border-color:var(--jade);background:var(--jade-soft);box-shadow:0 0 0 1px var(--jade) inset}
-.ot-chip .n{font-weight:600;font-size:14px;padding-right:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ot-chip .s{font-size:12px;color:var(--muted)}
-.ot-chip .t{color:var(--jade);font-weight:700;font-size:14px}
-.ot-chip .d{position:absolute;top:4px;right:6px;background:none;border:0;color:var(--red);font-size:18px;cursor:pointer;line-height:1}
-.ot-day{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;padding:6px 10px;background:var(--gold-soft);border-radius:8px;font-size:14px}
-.ot-day:first-child{margin-top:0}
-.ot-chip .dt{font-size:11px;color:var(--gold);font-weight:600}
-.ot-chip.new{border-style:dashed;color:var(--jade);font-weight:600;min-width:90px;display:grid;place-items:center}
-
 /* ---------- AI ASSISTANT ---------- */
 .chatbox{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:420px}
 .chat-log{flex:1;overflow-y:auto;padding:6px 2px;display:flex;flex-direction:column;gap:10px}
@@ -157,8 +142,7 @@ textarea{min-height:70px;resize:vertical}
   nav.side button{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;min-width:64px;align-items:center;text-align:center}
   nav.side .ico{font-size:18px}
   .pos{grid-template-columns:1fr}
-  .ticket{position:static;order:-1}      /* ບິນໃໝ່ຂຶ້ນເທິງສຸດໃນມືຖື */
-  .ticket .lines{max-height:26vh}        /* ລາຍການໃນບິນເລື່ອນໄດ້ ບໍ່ດັນຊ່ອງຄົ້ນຫາລົງໄກ */
+  .ticket{position:static}
   .chatbox{height:calc(100vh - 250px)}
   main{padding-bottom:110px}
 }
@@ -189,9 +173,7 @@ textarea{min-height:70px;resize:vertical}
 
     <!-- AI ASSISTANT -->
     <section class="view" id="v-ai">
-      <div class="row"><h1>ຜູ້ຊ່ວຍ AI</h1><span class="spacer"></span>
-        <button class="btn sm" onclick="setAiKey()">🔑 ຕັ້ງ Gemini Key</button>
-        <button class="btn sm" onclick="aiHistory=[];renderAi()">ລ້າງແຊັດ</button></div>
+      <h1>ຜູ້ຊ່ວຍ AI</h1>
       <div class="panel chatbox">
         <div class="chat-log" id="aiLog"></div>
         <div class="chat-suggest" id="aiSuggest">
@@ -211,7 +193,6 @@ textarea{min-height:70px;resize:vertical}
 
     <!-- POS -->
     <section class="view" id="v-pos">
-      <div class="ot-strip" id="otStrip"></div>
       <div class="pos">
         <div>
           <div class="row" style="margin-bottom:14px">
@@ -337,40 +318,19 @@ const store = {
 let pending = 0;
 function busy(d){ pending += d; const l = document.getElementById('loader'); l.style.width = pending > 0 ? '70%' : '0'; }
 
-// ຈຳກັດຍິງພ້ອມກັນ 3 ຄຳຂໍ + retry ອັດຕະໂນມັດ (ກັນ Apps Script ຕອບ HTML)
-const READ_ONLY = /^(get|search|debt[23]_get|debugCheck)/;
-let activeReq = 0; const waiters = [];
-async function acquire(){ if(activeReq >= 3) await new Promise(r => waiters.push(r)); activeReq++; }
-function release(){ activeReq--; const n = waiters.shift(); if(n) n(); }
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-
 async function api(fn, ...args){
   const url = (store.get('pos_api_url') || DEFAULT_API_URL), token = (store.get('pos_api_token') || DEFAULT_API_TOKEN);
   if(!url){ go('settings'); throw new Error('ກະລຸນາຕັ້ງຄ່າ URL ຂອງ Web App ກ່ອນ'); }
-  // retry ສະເພາະຟັງຊັນອ່ານ (ຂຽນຊ້ຳແລ້ວຂໍ້ມູນຊ້ອນ ຈຶ່ງບໍ່ retry ຟັງຊັນຂຽນ)
-  const canRetry = READ_ONLY.test(fn) || (fn === 'saveOpenTicket' && args[0] && args[0].ticketId);
-  const tries = canRetry ? 4 : 1;
   busy(1);
   try{
-    for(let n = 1; ; n++){
-      await acquire();
-      try{
-        const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-          body: JSON.stringify({ token, fn, args }) });
-        const text = await res.text();
-        let j;
-        try{ j = JSON.parse(text); }
-        catch(_){ const er = new Error(canRetry ? 'ເຊີບເວີຕິດຂັດຊົ່ວຄາວ ກະລຸນາລອງໃໝ່'
-          : 'ເຊີບເວີຕິດຂັດ — ບໍ່ແນ່ໃຈວ່າບັນທຶກແລ້ວບໍ່ ກະລຸນາກວດລາຍການກ່ອນກົດຊ້ຳ'); er.retry = true; throw er; }
-        if(!j.ok) throw new Error(j.error || 'ເກີດຂໍ້ຜິດພາດ');
-        return j.data;
-      }catch(e){
-        const transient = e.retry || e instanceof TypeError;
-        if(transient && n < tries){ await sleep(600 * n); continue; }
-        if(e instanceof TypeError) throw new Error('ເຊື່ອມຕໍ່ບໍ່ໄດ້: ກວດ URL ແລະ ການ Deploy (Anyone)');
-        throw e;
-      }finally{ release(); }
-    }
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ token, fn, args }) });
+    const j = await res.json();
+    if(!j.ok) throw new Error(j.error || 'ເກີດຂໍ້ຜິດພາດ');
+    return j.data;
+  }catch(e){
+    if(e instanceof TypeError) throw new Error('ເຊື່ອມຕໍ່ບໍ່ໄດ້: ກວດ URL ແລະ ການ Deploy (Anyone)');
+    throw e;
   }finally{ busy(-1) }
 }
 
@@ -425,14 +385,14 @@ const unitIsWeight = name => { const u = S.units.find(x => x.UnitName === name);
 const loaders = { dash:loadDash, ai:loadAI, pos:loadPos, products:loadProducts, stock:loadStock, invoices:loadInvoices,
   customers:loadCustomers, debts:loadDebts, settings:loadSettings };
 let CUR = 'dash';
-function reloadActive(){ Promise.resolve(loaders[CUR] && loaders[CUR]()).catch(e => toast(e.message, true)); }
+function reloadActive(){ loaders[CUR] && loaders[CUR]().catch(e => toast(e.message, true)); }
 function go(v){
   CUR = v;
   document.querySelectorAll('.view').forEach(x => x.classList.toggle('active', x.id === 'v-' + v));
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   store.set('pos_view', v);
   window.scrollTo(0,0);
-  Promise.resolve(loaders[v] && loaders[v]()).catch(e => toast(e.message, true));
+  loaders[v] && loaders[v]().catch(e => toast(e.message, true));
 }
 document.querySelectorAll('#nav button').forEach(b => b.onclick = () => go(b.dataset.v));
 
@@ -442,14 +402,8 @@ async function refreshBase(){
 }
 
 /* ======================= AI ASSISTANT ======================= */
-// ໜ້ານີ້ເອີ້ນ Gemini ໂດຍກົງຈາກ browser ແລະ ໃຊ້ຟັງຊັນຂໍ້ມູນເກົ່າຂອງເຈົ້າ (ບໍ່ຕ້ອງແກ້ Api.gs)
-const AI_MODEL = 'gemini-3-flash-preview';   // ຖ້າ error "model not found" ໃຫ້ປ່ຽນຊື່ນີ້
-let aiHistory = [], aiCtx = null, aiCtxAt = 0;
+let aiHistory = [];
 function loadAI(){ renderAi(); setTimeout(() => $('#aiInput') && $('#aiInput').focus(), 50); }
-function setAiKey(){
-  const k = prompt('ໃສ່ Gemini API Key (ເກັບໄວ້ໃນເຄື່ອງນີ້ເທົ່ານັ້ນ)', store.get('pos_gemini_key'));
-  if(k !== null){ store.set('pos_gemini_key', k.trim()); toast(k.trim() ? 'ບັນທຶກ Key ແລ້ວ' : 'ລຶບ Key ແລ້ວ'); }
-}
 function renderAi(){
   const log = $('#aiLog');
   log.innerHTML = aiHistory.length ? aiHistory.map(m => `<div class="bubble ${m.role}">${esc(m.text)}</div>`).join('')
@@ -457,140 +411,20 @@ function renderAi(){
   log.scrollTop = log.scrollHeight;
 }
 function askAiQuick(q){ $('#aiInput').value = q; sendAi(); }
-
-const daysSince = d => {
-  const t = new Date(ymd(d) + 'T00:00:00').getTime();
-  return isNaN(t) ? null : Math.max(0, Math.round((new Date(today() + 'T00:00:00').getTime() - t) / 864e5));
-};
-
-async function buildAiContext(q){
-  const g = (fn, ...a) => api(fn, ...a).catch(() => null);
-  const byDate = (x, y) => new Date(y.Date) - new Date(x.Date);
-  if(!aiCtx || Date.now() - aiCtxAt > 30000){
-    const [dash, top, customers, invoices, tx, products, b1, b2, b3] = await Promise.all([
-      g('getDashboardData'), g('getTopSellingProducts','monthly',10), g('getCustomers'),
-      g('getInvoices'), g('getTransactions'), g('getProducts'),
-      g('getDebtRecords'), g('debt2_getRecords'), g('debt3_getRecords')]);
-
-    // ---- ທຽບອາທິດ ----
-    const now = Date.now(), d7 = now - 7*864e5, d14 = now - 14*864e5;
-    let a = 0, b = 0, ac = 0, bc = 0;
-    (invoices || []).forEach(i => { const t = new Date(i.Date).getTime(); if(isNaN(t)) return; const m = Number(i.TotalAmount)||0;
-      if(t >= d7 && t <= now){ a += m; ac++; } else if(t >= d14 && t < d7){ b += m; bc++; } });
-
-    // ---- ສິນຄ້າ ແລະ ສະຕັອກ (ທຸກລາຍການ) ----
-    const prods = products || S.products || [];
-    const plist = prods.map(p => {
-      const st = Number(p.CurrentStock)||0, mn = Number(p.MinStock)||0;
-      return { ຊື່:p.ProductName, SKU:p.SKU, ປະເພດ:p.Category, ຄົງເຫຼືອ:st, ໜ່ວຍ:p.Unit, ຂັ້ນຕ່ຳ:mn,
-        ລາຄາຂາຍ:Number(p.SellingPrice)||0, ສະຖານະ: st <= 0 ? 'ໝົດ' : (st <= mn ? 'ໃກ້ໝົດ' : 'ພໍ') };
-    });
-    const stockValue = prods.reduce((s,p) => s + (Number(p.CostPrice)||0) * (Number(p.CurrentStock)||0), 0);
-
-    // ---- ໜີ້ ຈາກທັງ 3 ປຶ້ມ (ໂຄ້ດຄິດວັນ ແລະ ຍອດເອງ) ----
-    const by = {};
-    let unpaidAll = 0, unpaidCount = 0;
-    [[1,b1],[2,b2],[3,b3]].forEach(([book, arr]) => (arr || []).forEach(d => {
-      if(d.Status === 'Paid') return;
-      const name = String(d.CustomerName || 'ບໍ່ລະບຸຊື່').trim();
-      const days = daysSince(d.DateTaken), total = Number(d.TotalAmount)||0;
-      const c = by[name] || (by[name] = { ຊື່:name, ເບີໂທ:d.Phone || '', ຍອດຄ້າງລວມ:0, ຈຳນວນຄັ້ງທີ່ຄ້າງ:0, ຄ້າງມາດົນສຸດ_ວັນ:0, ລາຍການຄ້າງ:[] });
-      c.ຍອດຄ້າງລວມ += total; c.ຈຳນວນຄັ້ງທີ່ຄ້າງ++;
-      if(days !== null && days > c.ຄ້າງມາດົນສຸດ_ວັນ) c.ຄ້າງມາດົນສຸດ_ວັນ = days;
-      c.ລາຍການຄ້າງ.push({ ປຶ້ມໜີ້:book, ວັນທີເອົາເຄື່ອງ:ymd(d.DateTaken), ຄ້າງມາແລ້ວ_ວັນ:days, ຍອດ:total,
-        ເຄື່ອງທີ່ເອົາໄປ:(d.Items || []).map(i => ({ ຊື່:i.name, ລາຄາ:Number(i.price)||0 })), ໝາຍເຫດ:d.Note || '' });
-      unpaidAll += total; unpaidCount++;
-    }));
-    const debtors = Object.values(by).sort((x, y) => y.ຍອດຄ້າງລວມ - x.ຍອດຄ້າງລວມ);
-    debtors.forEach(c => c.ລາຍການຄ້າງ.sort((x, y) => String(x.ວັນທີເອົາເຄື່ອງ).localeCompare(String(y.ວັນທີເອົາເຄື່ອງ))));
-
-    aiCtx = {
-      ວັນທີປັດຈຸບັນ: today(),
-      ຍອດຂາຍ: dash && { ມື້ນີ້: dash.daily, ອາທິດນີ້: dash.weekly, ເດືອນນີ້: dash.monthly },
-      ທຽບອາທິດ: { ອາທິດນີ້_7ວັນຫຼ້າສຸດ: { ຍອດ: a, ຈຳນວນບິນ: ac }, ອາທິດແລ້ວ_7ວັນກ່ອນ: { ຍອດ: b, ຈຳນວນບິນ: bc }, ເປີເຊັນປ່ຽນ: b > 0 ? Math.round((a-b)/b*100) : null },
-      ໃບບິນຍັງບໍ່ຈ່າຍ: dash && { ຍອດ: dash.unpaidTotal, ຈຳນວນ: dash.unpaidCount },
-      ສິນຄ້າຂາຍດີເດືອນນີ້: top,
-      ສະຫຼຸບສະຕັອກ: { ຈຳນວນສິນຄ້າທັງໝົດ: plist.length, ໝົດ: plist.filter(p => p.ສະຖານະ === 'ໝົດ').length,
-        ໃກ້ໝົດ: plist.filter(p => p.ສະຖານະ === 'ໃກ້ໝົດ').length, ມູນຄ່າສະຕັອກ_ລາຄາທຶນ: stockValue },
-      ສິນຄ້າທັງໝົດ_ແລະ_ຄົງເຫຼືອ: plist,
-      ໜີ້ລູກຄ້າ: { ຍອດຄ້າງທັງໝົດ: unpaidAll, ຈຳນວນຄັ້ງທີ່ຄ້າງ: unpaidCount, ຈຳນວນລູກຄ້າທີ່ຄ້າງ: debtors.length, ລາຍຊື່ລູກຄ້າທີ່ຄ້າງ: debtors },
-      ລູກຄ້າຊື້ຫຼາຍສຸດ_8ຄົນ: (customers || []).map(c => ({ ຊື່: c.CustomerName, ຍອດຊື້ລວມ: Number(c.TotalSpent)||0, ຈຳນວນຄັ້ງ: Number(c.TotalOrders)||0 }))
-        .sort((x, y) => y.ຍອດຊື້ລວມ - x.ຍອດຊື້ລວມ).slice(0, 8),
-      ໃບບິນລ່າສຸດ_15ໃບ: (invoices || []).slice().sort(byDate).slice(0, 15).map(i => ({ ເລກບິນ: i.InvoiceNo, ວັນທີ: i.Date, ລູກຄ້າ: i.CustomerName || '-',
-        ຍອດ: Number(i.TotalAmount)||0, ຊຳລະ: i.PaymentMethod, ສະຖານະ: i.PaymentStatus })),
-      _customers: customers || [], _tx: tx || [], _products: prods
-    };
-    aiCtxAt = Date.now();
-  }
-  const { _customers, _tx, _products, ...ctx } = aiCtx;
-  const ql = q.toLowerCase();
-
-  // ຖ້າຄຳຖາມມີຊື່ສິນຄ້າ → ເພີ່ມລາຍລະອຽດ ແລະ ປະຫວັດເຂົ້າ-ອອກສະຕັອກ
-  const pm = _products.filter(p => { const n = String(p.ProductName || '').trim().toLowerCase(), s = String(p.SKU || '').trim().toLowerCase();
-    return (n.length > 1 && ql.includes(n)) || (s.length > 2 && ql.includes(s)); }).slice(0, 5);
-  if(pm.length) ctx['ສິນຄ້າທີ່ຖືກກ່າວເຖິງ'] = pm.map(p => {
-    const mv = _tx.filter(t => String(t.ProductID) === String(p.ProductID)).sort(byDate);
-    const sum = ty => mv.filter(t => t.Type === ty).reduce((s, t) => s + (Number(t.Quantity)||0), 0);
-    return { ຊື່: p.ProductName, ຄົງເຫຼືອ: Number(p.CurrentStock)||0, ໜ່ວຍ: p.Unit, ຂັ້ນຕ່ຳ: Number(p.MinStock)||0,
-      ລາຄາທຶນ: Number(p.CostPrice)||0, ລາຄາຂາຍ: Number(p.SellingPrice)||0,
-      ບັນທຶກເຂົ້າລວມ: sum('Stock In'), ບັນທຶກອອກລວມ: sum('Stock Out'),
-      ການເຄື່ອນໄຫວລ່າສຸດ_20: mv.slice(0, 20).map(t => ({ ວັນທີ: ymd(t.Date), ປະເພດ: t.Type === 'Stock In' ? 'ເຂົ້າ' : 'ອອກ', ຈຳນວນ: t.Quantity, ໝາຍເຫດ: t.Note })) };
-  });
-
-  // ຖ້າຄຳຖາມມີຊື່ລູກຄ້າ → ເພີ່ມປະຫວັດການຊື້
-  const m = _customers.find(c => String(c.CustomerName || '').trim().length > 2 && q.includes(String(c.CustomerName).trim()));
-  if(m){
-    const h = await g('getCustomerOrderHistory', m.CustomerID);
-    ctx['ລູກຄ້າທີ່ຖືກກ່າວເຖິງ'] = { ຊື່: m.CustomerName, ເບີໂທ: m.Phone, ຍອດຊື້ລວມ: Number(m.TotalSpent)||0, ຈຳນວນຄັ້ງຊື້: Number(m.TotalOrders)||0,
-      ປະຫວັດການຊື້ລ່າສຸດ: (h || []).slice(0, 15).map(x => ({ ວັນທີ: x.Date, ສິນຄ້າ: x.ProductName, ຈຳນວນ: x.Quantity, ລວມ: x.TotalPrice })) };
-  }
-  return ctx;
-}
-
-async function askGemini(q, history){
-  let key = store.get('pos_gemini_key');
-  if(!key){ setAiKey(); key = store.get('pos_gemini_key'); if(!key) throw new Error('ຍັງບໍ່ໄດ້ໃສ່ Gemini API Key'); }
-  const ctx = await buildAiContext(q);
-  const system =
-    'ເຈົ້າແມ່ນຜູ້ຊ່ວຍຂອງຮ້ານຄ້າ (ລະບົບ POS). ຕອບເປັນພາສາລາວ ຊັດເຈນ ຄົບຖ້ວນ. ສະກຸນເງິນ ກີບ (₭) ໃສ່ຈຸດຂັ້ນຫຼັກພັນ.\n' +
-    'ກົດເຫຼັກ:\n' +
-    '1) ໃຊ້ຕົວເລກຈາກ JSON ຕາມທີ່ມີເທົ່ານັ້ນ ຫ້າມເດົາ ຫ້າມແຕ່ງ ຫ້າມປັດເສດ. ຄ່າ "ຄ້າງມາແລ້ວ_ວັນ", "ຍອດຄ້າງລວມ", "ຄົງເຫຼືອ" ຖືກຄິດໄວ້ແລ້ວ ໃຫ້ນຳໃຊ້ໂດຍກົງ.\n' +
-    '2) ຖ້າຖາມສະຕັອກຂອງສິນຄ້າໃດ ໃຫ້ຫາຈາກ "ສິນຄ້າທັງໝົດ_ແລະ_ຄົງເຫຼືອ" ແລ້ວບອກ ຊື່ + ຄົງເຫຼືອ + ໜ່ວຍ + ສະຖານະ. ຖ້າຖາມ "ທັງໝົດ" ຫຼື "ທຸກລາຍການ" ໃຫ້ລະບຸຄົບທຸກລາຍການ ຫ້າມຕັດ. ຖ້າບໍ່ພົບຊື່ ໃຫ້ບອກວ່າບໍ່ພົບ ແລະແນະນຳຊື່ທີ່ໃກ້ຄຽງ.\n' +
-    '3) ຖ້າຖາມໜີ້ຂອງລູກຄ້າ ໃຫ້ຫາຈາກ "ໜີ້ລູກຄ້າ.ລາຍຊື່ລູກຄ້າທີ່ຄ້າງ" ແລ້ວບອກ: ຍອດຄ້າງລວມ, ຄ້າງມາດົນສຸດຈັກວັນ, ແລະລາຍການແຕ່ລະຄັ້ງຕາມວັນທີ (ວັນທີເອົາເຄື່ອງ, ຄ້າງມາຈັກວັນ, ເຄື່ອງທີ່ເອົາໄປ ພ້ອມລາຄາ, ຍອດຂອງຄັ້ງນັ້ນ). ຖ້າຊື່ບໍ່ຢູ່ໃນລາຍຊື່ ໃຫ້ບອກວ່າລູກຄ້ານີ້ບໍ່ມີໜີ້ຄ້າງ.\n' +
-    '4) ຖ້າຂໍ້ມູນບໍ່ພໍຕອບ ໃຫ້ບອກຕົງໆວ່າບໍ່ມີຂໍ້ມູນ.\n' +
-    '5) ຫ້າມໃຊ້ຮູບແບບ markdown (ຫ້າມ ** ຫຼື # ຫຼື |). ໃຫ້ໃຊ້ຂໍ້ຄວາມທຳມະດາ ແລະຂີດ - ນຳໜ້າແຕ່ລະລາຍການ ແຍກແຖວໃຫ້ອ່ານງ່າຍ.\n\n' +
-    'ຂໍ້ມູນຮ້ານ (JSON):\n' + JSON.stringify(ctx);
-  const contents = history.filter(m => m.text).map(m => ({ role: m.role === 'ai' ? 'model' : 'user', parts: [{ text: m.text }] }));
-  contents.push({ role: 'user', parts: [{ text: q }] });
-  const body = JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { maxOutputTokens: 4000 } });
-  let j = null, lastErr = '';
-  for(const model of [AI_MODEL, 'gemini-2.5-flash']){
-    for(let n = 0; n < 3; n++){
-      try{
-        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
-          method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key': key }, body });
-        j = await res.json();
-      }catch(e){ j = null; lastErr = e.message; }
-      if(j && !j.error) break;
-      if(j && j.error){ lastErr = j.error.message; if(![429, 500, 503].includes(j.error.code)) break; }
-      await sleep(1200 * (n + 1));
-    }
-    if(j && !j.error) break;
-  }
-  if(!j || j.error) throw new Error('Gemini: ' + lastErr);
-  const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
-  return (parts ? parts.map(p => p.text || '').join('') : '') || 'AI ບໍ່ໄດ້ຕອບກັບ ລອງຖາມໃໝ່';
-}
 async function sendAi(){
   const box = $('#aiInput'), q = box.value.trim(); if(!q) return;
   box.value = '';
-  const historyForApi = aiHistory.filter(m => m.text !== 'ກຳລັງວິເຄາະ...' && !m.text.startsWith('ຜິດພາດ:')).slice(-10);
+  const historyForApi = aiHistory.slice(); // ບໍ່ລວມຂໍ້ຄວາມ "ກຳລັງວິເຄາະ..."
   aiHistory.push({ role:'user', text:q });
   aiHistory.push({ role:'ai', text:'ກຳລັງວິເຄາະ...' });
   renderAi();
   $('#aiSend').disabled = true;
-  try{ aiHistory[aiHistory.length - 1] = { role:'ai', text: await askGemini(q, historyForApi) }; }
-  catch(e){ aiHistory[aiHistory.length - 1] = { role:'ai', text: 'ຜິດພາດ: ' + e.message }; }
+  try{
+    const r = await api('askShopAI', q, historyForApi);
+    aiHistory[aiHistory.length - 1] = { role:'ai', text: r.answer || 'ບໍ່ມີຄຳຕອບ' };
+  }catch(e){
+    aiHistory[aiHistory.length - 1] = { role:'ai', text: 'ຜິດພາດ: ' + e.message };
+  }
   $('#aiSend').disabled = false; renderAi();
 }
 
@@ -636,35 +470,10 @@ const opt = (v, l, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>
 
 async function loadPos(){
   const [st] = await Promise.all([api('getSettings').catch(() => ({})), refreshBase()]);
-  S.settings = st || {};
+  S.settings = st;
   renderPosGrid(); renderTicket(); updateOtCount();
 }
-
-// ---- ແຖບບິນຄ້າງ (ສະແດງຢູ່ໜ້າຂາຍຕະຫຼອດ) ----
-let OT = [];
-// ວັນທີຂອງບິນຄ້າງ ເກັບໃນ Sheet (ຄໍລຳ CreatedAt) — ແກ້ໄຂໄດ້ ແລະ ເຫັນຄືກັນທຸກເຄື່ອງ
-const otDate = t => t.CreatedAt;
-const toLocalInput = d => { const x = new Date(d); return isNaN(x) ? '' : ymd(x) + 'T' + pad2(x.getHours()) + ':' + pad2(x.getMinutes()); };
-const dmy = d => { const y = ymd(d); return y ? y.split('-').reverse().join('/') : ''; };
-const tName = t => { const n = String(t.TicketName || t.CustomerName || '-'); return /^\d{4}-\d\d-\d\dT/.test(n) ? dmy(n) : n; };
-async function updateOtCount(){
-  try{ OT = (await api('getOpenTickets')) || []; }catch(e){ return; }
-  if(!Array.isArray(OT)) OT = [];
-  $('#otCount').textContent = OT.length ? `(${OT.length})` : '';
-  renderOtStrip();
-}
-function renderOtStrip(){
-  const el = $('#otStrip'); if(!el) return;
-  el.innerHTML = `<div class="ot-chip new" onclick="newTicket()">+ ບິນໃໝ່</div>` + OT.map(t => `
-    <div class="ot-chip ${t.TicketID === cart.ticketId ? 'active' : ''}" onclick="loadTicket('${esc(t.TicketID)}')">
-      <button class="d" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')" aria-label="ລົບ">×</button>
-      <div class="n">${esc(tName(t))}</div>
-      <div class="dt num">${dmy(otDate(t)).slice(0,5)}</div>
-      <div class="s">${t.ItemCount} ລາຍການ</div>
-      <div class="t num">${money(t.TotalAmount)}</div>
-    </div>`).join('');
-}
-
+async function updateOtCount(){ try{ const t = await api('getOpenTickets'); $('#otCount').textContent = t.length ? `(${t.length})` : ''; }catch(e){} }
 function posList(){
   const q = $('#posSearch').value.trim().toLowerCase();
   return S.products.filter(p => !q || String(p.ProductName).toLowerCase().includes(q) || String(p.SKU).toLowerCase().includes(q));
@@ -715,7 +524,7 @@ function renderTicket(){
   const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === cart.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
   $('#ticket').innerHTML = `
     <div class="head">
-      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(/^\d{4}-\d\d-\d\dT/.test(cart.ticketName) ? dmy(cart.ticketName) : (cart.ticketName || '')) : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
+      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(cart.ticketName || '') : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
         <button class="btn sm" onclick="clearCart()">ລ້າງ</button></div>
       <select class="inp" id="tCust" style="margin-top:10px"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select>
       <div class="row" style="margin-top:8px">
@@ -744,19 +553,17 @@ function renderTicket(){
       <label style="flex:1;font-size:12px;color:var(--muted)">ສົດ<input class="inp num" type="number" value="${esc(cart.cash)}" oninput="cart.cash=this.value;cart.transfer=Math.max(0,cartTotal()-(Number(this.value)||0));$('#tTr').value=cart.transfer" style="margin:0"></label>
       <label style="flex:1;font-size:12px;color:var(--muted)">ໂອນ<input id="tTr" class="inp num" type="number" value="${esc(cart.transfer)}" oninput="cart.transfer=this.value" style="margin:0"></label></div>` : ''}
     ${cart.pay !== 'Cash' && S.settings.QRCodeURL ? `<div style="text-align:center;margin-top:8px"><img src="${esc(S.settings.QRCodeURL)}" style="width:130px" alt="QR ຮັບເງິນໂອນ"></div>` : ''}
-    <div style="font-size:12px;color:var(--muted);margin-top:8px">ວັນທີ-ເວລາບິນ (ປ່ອຍຫວ່າງ = ຕອນນີ້ · ແກ້ໄດ້ຕະຫຼອດ)</div>
-    <div class="row" style="margin-top:4px">
+    <div class="row" style="margin-top:8px">
       <input class="inp" type="datetime-local" value="${esc(cart.date)}" onchange="cart.date=this.value" title="ວັນທີຂາຍ (ປ່ອຍຫວ່າງ = ຕອນນີ້)" style="flex:1;margin:0">
       <button class="btn" onclick="signPad()">${cart.signature ? '✓ ເຊັນແລ້ວ' : 'ເຊັນຊື່'}</button>
     </div>
     <input class="inp" placeholder="ໝາຍເຫດ" value="${esc(cart.note)}" oninput="cart.note=this.value" style="margin-top:8px">
     <div class="row" style="margin-top:12px">
-      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>${cart.ticketId ? 'ບັນທຶກແກ້ໄຂ' : 'ພັກບິນ'}</button>
+      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>ພັກບິນ</button>
       <button class="btn pri" style="flex:2" id="btnCheckout" onclick="checkout()" ${cart.items.length ? '' : 'disabled'}>ຮັບເງິນ ${money(total)}</button>
     </div>`;
   $('#tCust').onchange = e => { const c = S.customers.find(x => x.CustomerID === e.target.value);
     cart.customerId = e.target.value; cart.customerName = c ? c.CustomerName : ''; cart.phone = c ? String(c.Phone||'') : ''; renderTicket(); };
-  renderOtStrip();
   updChange();
 }
 function updChange(){
@@ -787,105 +594,33 @@ function signPad(){
   };
 }
 
-const ticketPayload = () => ({ ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
-  customerName:cart.customerName, phone:cart.phone, items:cart.items, createdAt:cart.date || '' });
-
-// ບັນທຶກບິນຄ້າງທີ່ກຳລັງແກ້ຢູ່ ໂດຍບໍ່ຖາມຊື່ (ໃຊ້ກ່ອນສະລັບໄປບິນອື່ນ)
-async function saveTicketSilently(){
-  if(!cart.ticketId || !cart.items.length) return true;
-  return !!(await run(() => api('saveOpenTicket', ticketPayload())));
-}
-
 async function holdTicket(){
-  let name = cart.ticketName || cart.customerName || '';
-  if(!cart.ticketId){                       // ບິນໃໝ່ → ຖາມຊື່
-    name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', name);
-    if(name === null) return;
-  }
+  const name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', cart.ticketName || cart.customerName || '');
+  if(name === null) return;
   cart.ticketName = name;
-  const editing = !!cart.ticketId;
-  const r = await run(() => api('saveOpenTicket', ticketPayload()), editing ? 'ບັນທຶກການແກ້ໄຂແລ້ວ' : 'ພັກບິນແລ້ວ');
-  if(!r) return;
-  if(!editing) clearCart();                 // ບິນທີ່ແກ້ຢູ່ ຈະຄ້າງໄວ້ໃຫ້ແກ້ຕໍ່ໄດ້
-  updateOtCount();
+  const r = await run(() => api('saveOpenTicket', { ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
+    customerName:cart.customerName, phone:cart.phone, items:cart.items }), 'ພັກບິນແລ້ວ');
+  if(r){ clearCart(); updateOtCount(); }
 }
-
-async function newTicket(){
-  if(cart.ticketId){ if(!await saveTicketSilently()) return; }
-  else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເລີ່ມບິນໃໝ່ ແລະ ລ້າງບິນນີ້?')) return;
-  clearCart(); updateOtCount();
-}
-
 async function showOpenTickets(){
   openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   const list = await run(() => api('getOpenTickets')); if(!list) return;
-  OT = list; $('#otCount').textContent = list.length ? `(${list.length})` : ''; renderOtStrip();
-  if(!list.length){ $('#mBody').innerHTML = '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>'; return; }
-  const sorted = list.slice().sort((x, y) => new Date(otDate(y)) - new Date(otDate(x)));
-  const groups = {};
-  sorted.forEach(t => { const k = ymd(otDate(t)) || '-'; (groups[k] = groups[k] || []).push(t); });
-  $('#mBody').innerHTML = Object.keys(groups).sort().reverse().map(k => {
-    const g = groups[k], sum = g.reduce((s, t) => s + (Number(t.TotalAmount) || 0), 0);
-    return `<div class="ot-day"><b>📅 ${dmy(k) || 'ບໍ່ມີວັນທີ'}</b><span class="num">${g.length} ບິນ · ${money(sum)}</span></div>
-      <div class="tbl-wrap"><table>${g.map(t => `<tr>
-        <td><b>${esc(tName(t))}</b><br><small>${esc(t.CustomerName || '')} ${t.ItemCount} ລາຍການ · ${esc(toLocalInput(otDate(t)).slice(11))}</small></td>
-        <td class="r num">${money(t.TotalAmount)}</td>
-        <td class="r" style="white-space:nowrap"><button class="btn sm" onclick="viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
-          <button class="btn sm pri" onclick="loadTicket('${esc(t.TicketID)}')">ແກ້ໄຂ</button>
-          <button class="btn sm danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`;
-  }).join('');
+  $('#mBody').innerHTML = list.length ? `<div class="tbl-wrap"><table><tr><th>ຊື່ບິນ</th><th>ເວລາ</th><th class="r">ຍອດ</th><th></th></tr>
+    ${list.map(t => `<tr><td><b>${esc(t.TicketName || '-')}</b><br><small>${esc(t.CustomerName || '')} ${t.ItemCount} ລາຍການ</small></td>
+      <td>${fmtDate(t.CreatedAt)}</td><td class="r num">${money(t.TotalAmount)}</td>
+      <td class="r"><button class="btn sm pri" onclick="loadTicket('${esc(t.TicketID)}')">ເປີດ</button>
+        <button class="btn sm danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`
+    : '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>';
 }
-
-// ເບິ່ງບິນຄ້າງຄືນ + ແກ້ຊື່/ວັນທີ
-async function viewTicket(id){
-  openModal('ເບິ່ງບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
-  const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
-  const t = r.ticket, items = r.items || [];
-  const total = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
-  const dt = toLocalInput(t.CreatedAt);
-  $('#mBody').innerHTML = `
-    <div class="grid g2" style="gap:0 14px">
-      <label class="f">ຊື່ບິນ<input id="vName" value="${esc(/^\d{4}-\d\d-\d\dT/.test(String(t.TicketName)) ? '' : (t.TicketName || ''))}"></label>
-      <label class="f">ວັນທີ-ເວລາບິນ (ແກ້ໄດ້)<input id="vDate" type="datetime-local" value="${esc(dt)}"></label>
-    </div>
-    <small>${esc(t.CustomerName || 'ລູກຄ້າທົ່ວໄປ')} ${esc(t.Phone || '')}</small>
-    <div class="tbl-wrap"><table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
-      ${items.map(i => `<tr><td>${esc(i.productName)}</td><td class="r num">${esc(i.quantity)} ${esc(i.unit || '')}</td><td class="r num">${money(i.unitPrice)}</td>
-        <td class="r num">${money((Number(i.quantity) || 0) * (Number(i.unitPrice) || 0))}</td></tr>`).join('')}</table></div>
-    <div class="num" style="text-align:right;font-weight:700;font-size:18px;margin:10px 0">ລວມ ${money(total)}</div>
-    <div class="row"><button class="btn" onclick="showOpenTickets()">← ກັບຄືນ</button><span class="spacer"></span>
-      <button class="btn" id="vSave">ບັນທຶກຊື່/ວັນທີ</button>
-      <button class="btn pri" onclick="loadTicket('${esc(id)}')">ເປີດແກ້ໄຂບິນ</button></div>`;
-  $('#vSave').onclick = async () => {
-    const date = $('#vDate').value, name = $('#vName').value.trim();
-    const ok = await run(() => api('saveOpenTicket', { ticketId:id, ticketName:name, customerId:t.CustomerID || '', customerName:t.CustomerName || '',
-      phone:String(t.Phone || ''), items, createdAt:date }), 'ບັນທຶກແລ້ວ');
-    if(!ok) return;
-    if(cart.ticketId === id){ cart.ticketName = name; cart.date = date; renderTicket(); }
-    await updateOtCount(); showOpenTickets();
-  };
-}
-
 async function loadTicket(id){
-  if(id === cart.ticketId){ closeModal(); return; }
-  if(cart.ticketId){ if(!await saveTicketSilently()) return; }   // ບັນທຶກບິນເກົ່າອັດຕະໂນມັດ
-  else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
+  if(cart.items.length && !cart.ticketId && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
   cart = { ...newCart(), ticketId:r.ticket.TicketID, ticketName:r.ticket.TicketName||'', customerId:r.ticket.CustomerID||'',
-    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[], date:toLocalInput(r.ticket.CreatedAt) };
-  closeModal();
-  if(CUR !== 'pos') go('pos'); else { renderTicket(); updateOtCount(); }
-  window.scrollTo({ top:0, behavior:'smooth' });
+    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[] };
+  closeModal(); if(CUR !== 'pos') go('pos'); else renderTicket();
 }
-
-async function delTicket(id){
-  if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
-  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){
-    if(cart.ticketId === id) cart = newCart();
-    await updateOtCount(); renderTicket();
-    if($('#modalBg').classList.contains('open')) showOpenTickets();
-  }
-}
+async function delTicket(id){ if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
+  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){ showOpenTickets(); updateOtCount(); } }
 
 async function checkout(){
   const total = cartTotal();
@@ -1367,154 +1102,6 @@ async function applyBrand(){
 }
 
 /* ======================= START ======================= */
-  /* ======================= SUMMARY (ສະຫຼຸບ) ======================= */
-// ວາງກ້ອນນີ້ ກ່ອນບັນທັດ  /* ======================= START ======================= */
-const SM = { tab:'stock', tx:null, inv:null, det:{}, debts:null, seq:0, rows:[] };
-const fmtQ = n => (Math.round((Number(n)||0) * 1000) / 1000).toLocaleString('en-US');
-
-// ອາທິດເລີ່ມວັນຈັນ
-const wkStart = d => {
-  const s = /^\d{4}-\d\d-\d\d$/.test(d) ? d : ymd(d);
-  const x = new Date(s + 'T00:00:00'); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return ymd(x);
-};
-const pkey = (d, g) => { const y = ymd(d); if(!y) return '-';
-  return g === 'day' ? y : g === 'week' ? wkStart(y) : g === 'month' ? y.slice(0, 7) : y.slice(0, 4); };
-const plabel = (k, g) => k === '-' ? 'ບໍ່ມີວັນທີ' : g === 'day' ? dmy(k) : g === 'week' ? 'ອາທິດເລີ່ມ ' + dmy(k)
-  : g === 'month' ? 'ເດືອນ ' + k.slice(5) + '/' + k.slice(0, 4) : 'ປີ ' + k;
-
-function smDefaults(){
-  const g = $('#smGroup').value, t = new Date(), y = t.getFullYear(), m = t.getMonth();
-  const f = g === 'day' ? new Date(y, m, 1) : g === 'week' ? new Date(y, m, t.getDate() - 83)
-    : g === 'month' ? new Date(y, 0, 1) : new Date(y - 4, 0, 1);
-  $('#smFrom').value = ymd(f); $('#smTo').value = today();
-}
-document.querySelectorAll('#smTabs button').forEach(b => b.onclick = () => { SM.tab = b.dataset.t; renderSummary(); });
-$('#smGroup').onchange = () => { smDefaults(); renderSummary(); };
-['#smFrom', '#smTo'].forEach(id => $(id).onchange = renderSummary);
-function exportSummary(){ downloadCSV('summary.csv', SM.rows); }
-
-function loadSummary(force){
-  if(force === true){ SM.tx = SM.inv = SM.debts = null; SM.det = {}; }
-  if(!$('#smFrom').value) smDefaults();
-  return renderSummary();
-}
-
-async function renderSummary(){
-  const box = $('#smBody'), g = $('#smGroup').value, from = $('#smFrom').value, to = $('#smTo').value;
-  document.querySelectorAll('#smTabs button').forEach(b => b.classList.toggle('pri', b.dataset.t === SM.tab));
-  const my = ++SM.seq;
-  box.innerHTML = '<div class="empty">ກຳລັງໂຫຼດ...</div>';
-  try{
-    const html = SM.tab === 'stock' ? await smStock(g, from, to) : await smCust(g, from, to, my);
-    if(my === SM.seq) box.innerHTML = html;
-  }catch(e){ if(my === SM.seq) box.innerHTML = '<div class="empty">ຜິດພາດ: ' + esc(e.message) + ' — ກົດ "ໂຫຼດໃໝ່" ເພື່ອລອງອີກ</div>'; }
-}
-
-/* ---------- ແທັບ 1: ເຄື່ອງເຂົ້າ-ອອກ ---------- */
-async function smStock(g, from, to){
-  if(!SM.tx) SM.tx = await api('getTransactions');
-  if(!S.products.length) await refreshBase();
-  const unitOf = {}; S.products.forEach(p => unitOf[String(p.ProductID)] = p.Unit || '');
-  const list = SM.tx.filter(t => inRange(t.Date, from, to));
-  const P = {};
-  list.forEach(t => {
-    const k = pkey(t.Date, g), pid = String(t.ProductID);
-    const b = P[k] = P[k] || {};
-    const r = b[pid] = b[pid] || { name:t.ProductName, unit:unitOf[pid] || '', inn:0, out:0, n:0 };
-    const q = Number(t.Quantity) || 0;
-    if(t.Type === 'Stock In') r.inn += q; else if(t.Type === 'Stock Out') r.out += q;
-    r.n++;
-  });
-  SM.rows = [['ຊ່ວງ', 'ສິນຄ້າ', 'ເຂົ້າ', 'ອອກ', 'ສຸດທິ', 'ໜ່ວຍ']];
-  const keys = Object.keys(P).sort().reverse();
-  const body = keys.map(k => {
-    const rows = Object.values(P[k]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    const cnt = rows.reduce((s, r) => s + r.n, 0);
-    rows.forEach(r => SM.rows.push([plabel(k, g), r.name, r.inn, r.out, r.inn - r.out, r.unit]));
-    return `<div class="ot-day"><b>📅 ${esc(plabel(k, g))}</b><span class="num">${rows.length} ສິນຄ້າ · ${cnt} ຄັ້ງ</span></div>
-      <table><tr><th>ສິນຄ້າ</th><th class="r">ເຂົ້າ</th><th class="r">ອອກ</th><th class="r">ສຸດທິ</th><th>ໜ່ວຍ</th></tr>
-      ${rows.map(r => `<tr><td>${esc(r.name)}</td><td class="r num">${r.inn ? '+' + fmtQ(r.inn) : '-'}</td>
-        <td class="r num">${r.out ? '−' + fmtQ(r.out) : '-'}</td><td class="r num"><b>${fmtQ(r.inn - r.out)}</b></td><td>${esc(r.unit)}</td></tr>`).join('')}</table>`;
-  }).join('');
-  const head = `<div class="row" style="margin-bottom:10px"><b>${list.length} ລາຍການເຂົ້າ-ອອກ</b>
-    <small style="color:var(--muted)">ຕົວເລກແຍກຕາມສິນຄ້າ (ບໍ່ລວມຂ້າມໜ່ວຍ) · ອາທິດເລີ່ມວັນຈັນ</small></div>`;
-  return list.length ? head + body : '<div class="empty">ບໍ່ມີລາຍການເຂົ້າ-ອອກໃນຊ່ວງນີ້</div>';
-}
-
-/* ---------- ແທັບ 2: ລູກຄ້າ ສັ່ງຫຍັງ + ຈ່າຍ/ຄ້າງ ---------- */
-async function smCust(g, from, to, my){
-  if(!SM.inv) SM.inv = await api('getInvoices');
-  const invs = SM.inv.filter(i => inRange(i.Date, from, to));
-  const need = invs.filter(i => !SM.det[i.InvoiceNo]);
-  if(need.length > 200 && !confirm('ຕ້ອງໂຫຼດລາຍລະອຽດ ' + need.length + ' ໃບບິນ (ອາດໃຊ້ເວລາ). ສືບຕໍ່ບໍ?'))
-    return '<div class="empty">ຍົກເລີກ — ກະລຸນາຫຍໍ້ຊ່ວງວັນທີລົງ</div>';
-  let done = 0;
-  await Promise.all(need.map(async i => {
-    const r = await api('getInvoiceDetail', i.InvoiceNo);
-    SM.det[i.InvoiceNo] = r.items || [];
-    if(my === SM.seq && ++done % 5 === 0) $('#smBody').innerHTML = `<div class="empty">ກຳລັງໂຫຼດລາຍລະອຽດໃບບິນ ${done}/${need.length}...</div>`;
-  }));
-  if(!SM.debts){
-    const r = await Promise.all(['getDebtRecords', 'debt2_getRecords', 'debt3_getRecords'].map(f => api(f).catch(() => null)));
-    if(r.some(x => x === null)) throw new Error('ໂຫຼດປຶ້ມໜີ້ບໍ່ຄົບ');
-    SM.debts = r.map((a, n) => (a || []).map(d => ({ ...d, book:n + 1 }))).flat();
-  }
-
-  // ---- ລວມຕາມ ຊ່ວງ → ລູກຄ້າ → ສິນຄ້າ ----
-  const A = {}, sum = { total:0, paid:0, unpaid:0 };
-  invs.forEach(i => {
-    const k = pkey(i.Date, g), cn = String(i.CustomerName || '').trim() || 'ລູກຄ້າທົ່ວໄປ';
-    const st = i.PaymentStatus === 'Paid' ? 'paid' : 'unpaid', tot = Number(i.TotalAmount) || 0;
-    A[k] = A[k] || {};
-    const c = A[k][cn] = A[k][cn] || { bills:0, total:0, paid:0, unpaid:0, prods:{} };
-    c.bills++; c.total += tot; c[st] += tot; sum.total += tot; sum[st] += tot;
-    (SM.det[i.InvoiceNo] || []).forEach(it => {
-      const p = c.prods[it.ProductName] = c.prods[it.ProductName] || { qty:0, amt:0, paid:0, unpaid:0 };
-      const q = Number(it.Quantity) || 0, lt = Number(it.LineTotal) || q * (Number(it.UnitPrice) || 0);
-      p.qty += q; p.amt += lt; p[st] += lt;
-    });
-  });
-  SM.rows = [['ຊ່ວງ', 'ລູກຄ້າ', 'ສິນຄ້າ', 'ຈຳນວນ', 'ຍອດ', 'ຈ່າຍແລ້ວ', 'ຄ້າງ']];
-  const keys = Object.keys(A).sort().reverse();
-  const body = keys.map(k => {
-    const cs = Object.entries(A[k]).sort((a, b) => b[1].total - a[1].total);
-    const pt = cs.reduce((s, [, c]) => s + c.total, 0), pp = cs.reduce((s, [, c]) => s + c.paid, 0), pu = cs.reduce((s, [, c]) => s + c.unpaid, 0);
-    const rows = cs.map(([cn, c]) => {
-      SM.rows.push([plabel(k, g), cn, '(ລວມ ' + c.bills + ' ບິນ)', '', c.total, c.paid, c.unpaid]);
-      const pr = Object.entries(c.prods).sort((a, b) => b[1].amt - a[1].amt);
-      pr.forEach(([n, p]) => SM.rows.push([plabel(k, g), cn, n, p.qty, p.amt, p.paid, p.unpaid]));
-      return `<tr style="background:#F6F8F7;font-weight:600"><td>${esc(cn)} <small>(${c.bills} ບິນ)</small></td><td></td>
-        <td class="r num">${money(c.total)}</td><td class="r num" style="color:var(--jade)">${money(c.paid)}</td>
-        <td class="r num" style="color:var(--red)">${money(c.unpaid)}</td></tr>` +
-        pr.map(([n, p]) => `<tr><td style="padding-left:26px">${esc(n)}</td><td class="r num">${fmtQ(p.qty)}</td>
-          <td class="r num">${money(p.amt)}</td><td class="r num">${p.paid ? money(p.paid) : '-'}</td><td class="r num">${p.unpaid ? money(p.unpaid) : '-'}</td></tr>`).join('');
-    }).join('');
-    return `<div class="ot-day"><b>📅 ${esc(plabel(k, g))}</b><span class="num">ລວມ ${money(pt)} · ຈ່າຍ ${money(pp)} · ຄ້າງ ${money(pu)}</span></div>
-      <div class="tbl-wrap"><table><tr><th>ລູກຄ້າ / ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ຍອດ</th><th class="r">ຈ່າຍແລ້ວ</th><th class="r">ຄ້າງ</th></tr>${rows}</table></div>`;
-  }).join('');
-
-  // ---- ໜີ້ໃນປຶ້ມໜີ້ (ນັບຕາມວັນທີເອົາເຄື່ອງ) ----
-  const D = {};
-  SM.debts.filter(d => inRange(d.DateTaken, from, to)).forEach(d => {
-    const n = String(d.CustomerName || '').trim() || 'ບໍ່ລະບຸຊື່';
-    const c = D[n] = D[n] || { paid:0, unpaid:0, cnt:0 };
-    c[d.Status === 'Paid' ? 'paid' : 'unpaid'] += Number(d.TotalAmount) || 0; c.cnt++;
-  });
-  const dl = Object.entries(D).sort((a, b) => b[1].unpaid - a[1].unpaid);
-  const dUn = dl.reduce((s, [, c]) => s + c.unpaid, 0), dPd = dl.reduce((s, [, c]) => s + c.paid, 0);
-  const debtHtml = `<div class="ot-day" style="margin-top:22px"><b>📒 ປຶ້ມໜີ້ (ທັງ 3 ປຶ້ມ · ແຍກຈາກໃບບິນຂ້າງເທິງ)</b>
-    <span class="num">ຄ້າງ ${money(dUn)} · ຈ່າຍແລ້ວ ${money(dPd)}</span></div>` + (dl.length ?
-    `<div class="tbl-wrap"><table><tr><th>ລູກຄ້າ</th><th class="r">ຄັ້ງ</th><th class="r">ຄ້າງ</th><th class="r">ຈ່າຍແລ້ວ</th><th class="r">ລວມ</th></tr>
-    ${dl.map(([n, c]) => `<tr><td>${esc(n)}</td><td class="r num">${c.cnt}</td><td class="r num" style="color:var(--red)">${money(c.unpaid)}</td>
-      <td class="r num" style="color:var(--jade)">${money(c.paid)}</td><td class="r num">${money(c.unpaid + c.paid)}</td></tr>`).join('')}</table></div>`
-    : '<div class="empty">ບໍ່ມີລາຍການໃນປຶ້ມໜີ້ໃນຊ່ວງນີ້</div>');
-
-  const cards = `<div class="grid g3" style="margin-bottom:14px">
-    <div class="panel stat"><div class="lbl">ຍອດຂາຍ (${invs.length} ໃບບິນ)</div><div class="val num">${money(sum.total)}</div></div>
-    <div class="panel stat"><div class="lbl">ຈ່າຍແລ້ວ</div><div class="val num" style="color:var(--jade)">${money(sum.paid)}</div></div>
-    <div class="panel stat ${sum.unpaid ? 'warn' : ''}"><div class="lbl">ຍັງຄ້າງ (ໃບບິນ)</div><div class="val num">${money(sum.unpaid)}</div></div></div>`;
-  return cards + (invs.length ? body : '<div class="empty">ບໍ່ມີໃບບິນໃນຊ່ວງນີ້</div>') + debtHtml;
-}
 if(!(store.get('pos_api_token') || DEFAULT_API_TOKEN)) { go('settings'); toast('ກະລຸນາໃສ່ລະຫັດ API ເພື່ອເລີ່ມໃຊ້ງານ'); }
 else { go(store.get('pos_view') || 'dash'); applyBrand(); }
 </script>
