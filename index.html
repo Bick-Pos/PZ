@@ -1291,5 +1291,27 @@ else { go(store.get('pos_view') || 'dash'); applyBrand(); }
   };
 })();
 </script>
+<script>
+(function(){
+  // ຫາໜ່ວຍນັບຂອງສິນຄ້າຈາກ ProductID
+  const unitOf = pid => {
+    const p = S.products.find(x => String(x.ProductID) === String(pid));
+    return p ? (p.Unit || '') : '';
+  };
+
+  // ເພີ່ມ Unit ໃສ່ແຕ່ລະລາຍການ ກ່ອນສ້າງໃບບິນ (ຖ້າ backend ສົ່ງ Unit ມາແລ້ວ ຈະໃຊ້ຄ່ານັ້ນກ່ອນ)
+  const prevReceipt = window.receiptHtml;
+  window.receiptHtml = function(inv, items, st){
+    return prevReceipt(inv, items.map(i => ({ ...i, Unit: i.Unit || unitOf(i.ProductID) })), st);
+  };
+
+  // ໃຫ້ແນ່ໃຈວ່າໂຫຼດລາຍການສິນຄ້າແລ້ວກ່ອນເປີດໃບບິນ (ເຊັ່ນ ເປີດຈາກແທັບໃບບິນໂດຍກົງ)
+  const prevShow = window.showInvoice;
+  window.showInvoice = async function(no){
+    if(!S.products.length){ try{ await refreshBase(); }catch(e){} }
+    return prevShow(no);
+  };
+})();
+</script>
 </body>
 </html>
