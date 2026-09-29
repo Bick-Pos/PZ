@@ -1367,6 +1367,154 @@ async function applyBrand(){
 }
 
 /* ======================= START ======================= */
+  /* ======================= SUMMARY (ສະຫຼຸບ) ======================= */
+// ວາງກ້ອນນີ້ ກ່ອນບັນທັດ  /* ======================= START ======================= */
+const SM = { tab:'stock', tx:null, inv:null, det:{}, debts:null, seq:0, rows:[] };
+const fmtQ = n => (Math.round((Number(n)||0) * 1000) / 1000).toLocaleString('en-US');
+
+// ອາທິດເລີ່ມວັນຈັນ
+const wkStart = d => {
+  const s = /^\d{4}-\d\d-\d\d$/.test(d) ? d : ymd(d);
+  const x = new Date(s + 'T00:00:00'); x.setDate(x.getDate() - (x.getDay() + 6) % 7); return ymd(x);
+};
+const pkey = (d, g) => { const y = ymd(d); if(!y) return '-';
+  return g === 'day' ? y : g === 'week' ? wkStart(y) : g === 'month' ? y.slice(0, 7) : y.slice(0, 4); };
+const plabel = (k, g) => k === '-' ? 'ບໍ່ມີວັນທີ' : g === 'day' ? dmy(k) : g === 'week' ? 'ອາທິດເລີ່ມ ' + dmy(k)
+  : g === 'month' ? 'ເດືອນ ' + k.slice(5) + '/' + k.slice(0, 4) : 'ປີ ' + k;
+
+function smDefaults(){
+  const g = $('#smGroup').value, t = new Date(), y = t.getFullYear(), m = t.getMonth();
+  const f = g === 'day' ? new Date(y, m, 1) : g === 'week' ? new Date(y, m, t.getDate() - 83)
+    : g === 'month' ? new Date(y, 0, 1) : new Date(y - 4, 0, 1);
+  $('#smFrom').value = ymd(f); $('#smTo').value = today();
+}
+document.querySelectorAll('#smTabs button').forEach(b => b.onclick = () => { SM.tab = b.dataset.t; renderSummary(); });
+$('#smGroup').onchange = () => { smDefaults(); renderSummary(); };
+['#smFrom', '#smTo'].forEach(id => $(id).onchange = renderSummary);
+function exportSummary(){ downloadCSV('summary.csv', SM.rows); }
+
+function loadSummary(force){
+  if(force === true){ SM.tx = SM.inv = SM.debts = null; SM.det = {}; }
+  if(!$('#smFrom').value) smDefaults();
+  return renderSummary();
+}
+
+async function renderSummary(){
+  const box = $('#smBody'), g = $('#smGroup').value, from = $('#smFrom').value, to = $('#smTo').value;
+  document.querySelectorAll('#smTabs button').forEach(b => b.classList.toggle('pri', b.dataset.t === SM.tab));
+  const my = ++SM.seq;
+  box.innerHTML = '<div class="empty">ກຳລັງໂຫຼດ...</div>';
+  try{
+    const html = SM.tab === 'stock' ? await smStock(g, from, to) : await smCust(g, from, to, my);
+    if(my === SM.seq) box.innerHTML = html;
+  }catch(e){ if(my === SM.seq) box.innerHTML = '<div class="empty">ຜິດພາດ: ' + esc(e.message) + ' — ກົດ "ໂຫຼດໃໝ່" ເພື່ອລອງອີກ</div>'; }
+}
+
+/* ---------- ແທັບ 1: ເຄື່ອງເຂົ້າ-ອອກ ---------- */
+async function smStock(g, from, to){
+  if(!SM.tx) SM.tx = await api('getTransactions');
+  if(!S.products.length) await refreshBase();
+  const unitOf = {}; S.products.forEach(p => unitOf[String(p.ProductID)] = p.Unit || '');
+  const list = SM.tx.filter(t => inRange(t.Date, from, to));
+  const P = {};
+  list.forEach(t => {
+    const k = pkey(t.Date, g), pid = String(t.ProductID);
+    const b = P[k] = P[k] || {};
+    const r = b[pid] = b[pid] || { name:t.ProductName, unit:unitOf[pid] || '', inn:0, out:0, n:0 };
+    const q = Number(t.Quantity) || 0;
+    if(t.Type === 'Stock In') r.inn += q; else if(t.Type === 'Stock Out') r.out += q;
+    r.n++;
+  });
+  SM.rows = [['ຊ່ວງ', 'ສິນຄ້າ', 'ເຂົ້າ', 'ອອກ', 'ສຸດທິ', 'ໜ່ວຍ']];
+  const keys = Object.keys(P).sort().reverse();
+  const body = keys.map(k => {
+    const rows = Object.values(P[k]).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const cnt = rows.reduce((s, r) => s + r.n, 0);
+    rows.forEach(r => SM.rows.push([plabel(k, g), r.name, r.inn, r.out, r.inn - r.out, r.unit]));
+    return `<div class="ot-day"><b>📅 ${esc(plabel(k, g))}</b><span class="num">${rows.length} ສິນຄ້າ · ${cnt} ຄັ້ງ</span></div>
+      <table><tr><th>ສິນຄ້າ</th><th class="r">ເຂົ້າ</th><th class="r">ອອກ</th><th class="r">ສຸດທິ</th><th>ໜ່ວຍ</th></tr>
+      ${rows.map(r => `<tr><td>${esc(r.name)}</td><td class="r num">${r.inn ? '+' + fmtQ(r.inn) : '-'}</td>
+        <td class="r num">${r.out ? '−' + fmtQ(r.out) : '-'}</td><td class="r num"><b>${fmtQ(r.inn - r.out)}</b></td><td>${esc(r.unit)}</td></tr>`).join('')}</table>`;
+  }).join('');
+  const head = `<div class="row" style="margin-bottom:10px"><b>${list.length} ລາຍການເຂົ້າ-ອອກ</b>
+    <small style="color:var(--muted)">ຕົວເລກແຍກຕາມສິນຄ້າ (ບໍ່ລວມຂ້າມໜ່ວຍ) · ອາທິດເລີ່ມວັນຈັນ</small></div>`;
+  return list.length ? head + body : '<div class="empty">ບໍ່ມີລາຍການເຂົ້າ-ອອກໃນຊ່ວງນີ້</div>';
+}
+
+/* ---------- ແທັບ 2: ລູກຄ້າ ສັ່ງຫຍັງ + ຈ່າຍ/ຄ້າງ ---------- */
+async function smCust(g, from, to, my){
+  if(!SM.inv) SM.inv = await api('getInvoices');
+  const invs = SM.inv.filter(i => inRange(i.Date, from, to));
+  const need = invs.filter(i => !SM.det[i.InvoiceNo]);
+  if(need.length > 200 && !confirm('ຕ້ອງໂຫຼດລາຍລະອຽດ ' + need.length + ' ໃບບິນ (ອາດໃຊ້ເວລາ). ສືບຕໍ່ບໍ?'))
+    return '<div class="empty">ຍົກເລີກ — ກະລຸນາຫຍໍ້ຊ່ວງວັນທີລົງ</div>';
+  let done = 0;
+  await Promise.all(need.map(async i => {
+    const r = await api('getInvoiceDetail', i.InvoiceNo);
+    SM.det[i.InvoiceNo] = r.items || [];
+    if(my === SM.seq && ++done % 5 === 0) $('#smBody').innerHTML = `<div class="empty">ກຳລັງໂຫຼດລາຍລະອຽດໃບບິນ ${done}/${need.length}...</div>`;
+  }));
+  if(!SM.debts){
+    const r = await Promise.all(['getDebtRecords', 'debt2_getRecords', 'debt3_getRecords'].map(f => api(f).catch(() => null)));
+    if(r.some(x => x === null)) throw new Error('ໂຫຼດປຶ້ມໜີ້ບໍ່ຄົບ');
+    SM.debts = r.map((a, n) => (a || []).map(d => ({ ...d, book:n + 1 }))).flat();
+  }
+
+  // ---- ລວມຕາມ ຊ່ວງ → ລູກຄ້າ → ສິນຄ້າ ----
+  const A = {}, sum = { total:0, paid:0, unpaid:0 };
+  invs.forEach(i => {
+    const k = pkey(i.Date, g), cn = String(i.CustomerName || '').trim() || 'ລູກຄ້າທົ່ວໄປ';
+    const st = i.PaymentStatus === 'Paid' ? 'paid' : 'unpaid', tot = Number(i.TotalAmount) || 0;
+    A[k] = A[k] || {};
+    const c = A[k][cn] = A[k][cn] || { bills:0, total:0, paid:0, unpaid:0, prods:{} };
+    c.bills++; c.total += tot; c[st] += tot; sum.total += tot; sum[st] += tot;
+    (SM.det[i.InvoiceNo] || []).forEach(it => {
+      const p = c.prods[it.ProductName] = c.prods[it.ProductName] || { qty:0, amt:0, paid:0, unpaid:0 };
+      const q = Number(it.Quantity) || 0, lt = Number(it.LineTotal) || q * (Number(it.UnitPrice) || 0);
+      p.qty += q; p.amt += lt; p[st] += lt;
+    });
+  });
+  SM.rows = [['ຊ່ວງ', 'ລູກຄ້າ', 'ສິນຄ້າ', 'ຈຳນວນ', 'ຍອດ', 'ຈ່າຍແລ້ວ', 'ຄ້າງ']];
+  const keys = Object.keys(A).sort().reverse();
+  const body = keys.map(k => {
+    const cs = Object.entries(A[k]).sort((a, b) => b[1].total - a[1].total);
+    const pt = cs.reduce((s, [, c]) => s + c.total, 0), pp = cs.reduce((s, [, c]) => s + c.paid, 0), pu = cs.reduce((s, [, c]) => s + c.unpaid, 0);
+    const rows = cs.map(([cn, c]) => {
+      SM.rows.push([plabel(k, g), cn, '(ລວມ ' + c.bills + ' ບິນ)', '', c.total, c.paid, c.unpaid]);
+      const pr = Object.entries(c.prods).sort((a, b) => b[1].amt - a[1].amt);
+      pr.forEach(([n, p]) => SM.rows.push([plabel(k, g), cn, n, p.qty, p.amt, p.paid, p.unpaid]));
+      return `<tr style="background:#F6F8F7;font-weight:600"><td>${esc(cn)} <small>(${c.bills} ບິນ)</small></td><td></td>
+        <td class="r num">${money(c.total)}</td><td class="r num" style="color:var(--jade)">${money(c.paid)}</td>
+        <td class="r num" style="color:var(--red)">${money(c.unpaid)}</td></tr>` +
+        pr.map(([n, p]) => `<tr><td style="padding-left:26px">${esc(n)}</td><td class="r num">${fmtQ(p.qty)}</td>
+          <td class="r num">${money(p.amt)}</td><td class="r num">${p.paid ? money(p.paid) : '-'}</td><td class="r num">${p.unpaid ? money(p.unpaid) : '-'}</td></tr>`).join('');
+    }).join('');
+    return `<div class="ot-day"><b>📅 ${esc(plabel(k, g))}</b><span class="num">ລວມ ${money(pt)} · ຈ່າຍ ${money(pp)} · ຄ້າງ ${money(pu)}</span></div>
+      <div class="tbl-wrap"><table><tr><th>ລູກຄ້າ / ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ຍອດ</th><th class="r">ຈ່າຍແລ້ວ</th><th class="r">ຄ້າງ</th></tr>${rows}</table></div>`;
+  }).join('');
+
+  // ---- ໜີ້ໃນປຶ້ມໜີ້ (ນັບຕາມວັນທີເອົາເຄື່ອງ) ----
+  const D = {};
+  SM.debts.filter(d => inRange(d.DateTaken, from, to)).forEach(d => {
+    const n = String(d.CustomerName || '').trim() || 'ບໍ່ລະບຸຊື່';
+    const c = D[n] = D[n] || { paid:0, unpaid:0, cnt:0 };
+    c[d.Status === 'Paid' ? 'paid' : 'unpaid'] += Number(d.TotalAmount) || 0; c.cnt++;
+  });
+  const dl = Object.entries(D).sort((a, b) => b[1].unpaid - a[1].unpaid);
+  const dUn = dl.reduce((s, [, c]) => s + c.unpaid, 0), dPd = dl.reduce((s, [, c]) => s + c.paid, 0);
+  const debtHtml = `<div class="ot-day" style="margin-top:22px"><b>📒 ປຶ້ມໜີ້ (ທັງ 3 ປຶ້ມ · ແຍກຈາກໃບບິນຂ້າງເທິງ)</b>
+    <span class="num">ຄ້າງ ${money(dUn)} · ຈ່າຍແລ້ວ ${money(dPd)}</span></div>` + (dl.length ?
+    `<div class="tbl-wrap"><table><tr><th>ລູກຄ້າ</th><th class="r">ຄັ້ງ</th><th class="r">ຄ້າງ</th><th class="r">ຈ່າຍແລ້ວ</th><th class="r">ລວມ</th></tr>
+    ${dl.map(([n, c]) => `<tr><td>${esc(n)}</td><td class="r num">${c.cnt}</td><td class="r num" style="color:var(--red)">${money(c.unpaid)}</td>
+      <td class="r num" style="color:var(--jade)">${money(c.paid)}</td><td class="r num">${money(c.unpaid + c.paid)}</td></tr>`).join('')}</table></div>`
+    : '<div class="empty">ບໍ່ມີລາຍການໃນປຶ້ມໜີ້ໃນຊ່ວງນີ້</div>');
+
+  const cards = `<div class="grid g3" style="margin-bottom:14px">
+    <div class="panel stat"><div class="lbl">ຍອດຂາຍ (${invs.length} ໃບບິນ)</div><div class="val num">${money(sum.total)}</div></div>
+    <div class="panel stat"><div class="lbl">ຈ່າຍແລ້ວ</div><div class="val num" style="color:var(--jade)">${money(sum.paid)}</div></div>
+    <div class="panel stat ${sum.unpaid ? 'warn' : ''}"><div class="lbl">ຍັງຄ້າງ (ໃບບິນ)</div><div class="val num">${money(sum.unpaid)}</div></div></div>`;
+  return cards + (invs.length ? body : '<div class="empty">ບໍ່ມີໃບບິນໃນຊ່ວງນີ້</div>') + debtHtml;
+}
 if(!(store.get('pos_api_token') || DEFAULT_API_TOKEN)) { go('settings'); toast('ກະລຸນາໃສ່ລະຫັດ API ເພື່ອເລີ່ມໃຊ້ງານ'); }
 else { go(store.get('pos_view') || 'dash'); applyBrand(); }
 </script>
