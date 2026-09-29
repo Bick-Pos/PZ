@@ -337,19 +337,40 @@ const store = {
 let pending = 0;
 function busy(d){ pending += d; const l = document.getElementById('loader'); l.style.width = pending > 0 ? '70%' : '0'; }
 
+// ຈຳກັດຍິງພ້ອມກັນ 3 ຄຳຂໍ + retry ອັດຕະໂນມັດ (ກັນ Apps Script ຕອບ HTML)
+const READ_ONLY = /^(get|search|debt[23]_get|debugCheck)/;
+let activeReq = 0; const waiters = [];
+async function acquire(){ if(activeReq >= 3) await new Promise(r => waiters.push(r)); activeReq++; }
+function release(){ activeReq--; const n = waiters.shift(); if(n) n(); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
 async function api(fn, ...args){
   const url = (store.get('pos_api_url') || DEFAULT_API_URL), token = (store.get('pos_api_token') || DEFAULT_API_TOKEN);
   if(!url){ go('settings'); throw new Error('ກະລຸນາຕັ້ງຄ່າ URL ຂອງ Web App ກ່ອນ'); }
+  // retry ສະເພາະຟັງຊັນອ່ານ (ຂຽນຊ້ຳແລ້ວຂໍ້ມູນຊ້ອນ ຈຶ່ງບໍ່ retry ຟັງຊັນຂຽນ)
+  const canRetry = READ_ONLY.test(fn) || (fn === 'saveOpenTicket' && args[0] && args[0].ticketId);
+  const tries = canRetry ? 4 : 1;
   busy(1);
   try{
-    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body: JSON.stringify({ token, fn, args }) });
-    const j = await res.json();
-    if(!j.ok) throw new Error(j.error || 'ເກີດຂໍ້ຜິດພາດ');
-    return j.data;
-  }catch(e){
-    if(e instanceof TypeError) throw new Error('ເຊື່ອມຕໍ່ບໍ່ໄດ້: ກວດ URL ແລະ ການ Deploy (Anyone)');
-    throw e;
+    for(let n = 1; ; n++){
+      await acquire();
+      try{
+        const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+          body: JSON.stringify({ token, fn, args }) });
+        const text = await res.text();
+        let j;
+        try{ j = JSON.parse(text); }
+        catch(_){ const er = new Error(canRetry ? 'ເຊີບເວີຕິດຂັດຊົ່ວຄາວ ກະລຸນາລອງໃໝ່'
+          : 'ເຊີບເວີຕິດຂັດ — ບໍ່ແນ່ໃຈວ່າບັນທຶກແລ້ວບໍ່ ກະລຸນາກວດລາຍການກ່ອນກົດຊ້ຳ'); er.retry = true; throw er; }
+        if(!j.ok) throw new Error(j.error || 'ເກີດຂໍ້ຜິດພາດ');
+        return j.data;
+      }catch(e){
+        const transient = e.retry || e instanceof TypeError;
+        if(transient && n < tries){ await sleep(600 * n); continue; }
+        if(e instanceof TypeError) throw new Error('ເຊື່ອມຕໍ່ບໍ່ໄດ້: ກວດ URL ແລະ ການ Deploy (Anyone)');
+        throw e;
+      }finally{ release(); }
+    }
   }finally{ busy(-1) }
 }
 
@@ -404,14 +425,14 @@ const unitIsWeight = name => { const u = S.units.find(x => x.UnitName === name);
 const loaders = { dash:loadDash, ai:loadAI, pos:loadPos, products:loadProducts, stock:loadStock, invoices:loadInvoices,
   customers:loadCustomers, debts:loadDebts, settings:loadSettings };
 let CUR = 'dash';
-function reloadActive(){ loaders[CUR] && loaders[CUR]().catch(e => toast(e.message, true)); }
+function reloadActive(){ Promise.resolve(loaders[CUR] && loaders[CUR]()).catch(e => toast(e.message, true)); }
 function go(v){
   CUR = v;
   document.querySelectorAll('.view').forEach(x => x.classList.toggle('active', x.id === 'v-' + v));
   document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   store.set('pos_view', v);
   window.scrollTo(0,0);
-  loaders[v] && loaders[v]().catch(e => toast(e.message, true));
+  Promise.resolve(loaders[v] && loaders[v]()).catch(e => toast(e.message, true));
 }
 document.querySelectorAll('#nav button').forEach(b => b.onclick = () => go(b.dataset.v));
 
@@ -541,11 +562,22 @@ async function askGemini(q, history){
     'ຂໍ້ມູນຮ້ານ (JSON):\n' + JSON.stringify(ctx);
   const contents = history.filter(m => m.text).map(m => ({ role: m.role === 'ai' ? 'model' : 'user', parts: [{ text: m.text }] }));
   contents.push({ role: 'user', parts: [{ text: q }] });
-  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent', {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { maxOutputTokens: 4000 } }) });
-  const j = await res.json();
-  if(j.error) throw new Error('Gemini: ' + j.error.message);
+  const body = JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { maxOutputTokens: 4000 } });
+  let j = null, lastErr = '';
+  for(const model of [AI_MODEL, 'gemini-2.5-flash']){
+    for(let n = 0; n < 3; n++){
+      try{
+        const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent', {
+          method:'POST', headers:{ 'Content-Type':'application/json', 'x-goog-api-key': key }, body });
+        j = await res.json();
+      }catch(e){ j = null; lastErr = e.message; }
+      if(j && !j.error) break;
+      if(j && j.error){ lastErr = j.error.message; if(![429, 500, 503].includes(j.error.code)) break; }
+      await sleep(1200 * (n + 1));
+    }
+    if(j && !j.error) break;
+  }
+  if(!j || j.error) throw new Error('Gemini: ' + lastErr);
   const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
   return (parts ? parts.map(p => p.text || '').join('') : '') || 'AI ບໍ່ໄດ້ຕອບກັບ ລອງຖາມໃໝ່';
 }
@@ -604,7 +636,7 @@ const opt = (v, l, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>
 
 async function loadPos(){
   const [st] = await Promise.all([api('getSettings').catch(() => ({})), refreshBase()]);
-  S.settings = st;
+  S.settings = st || {};
   renderPosGrid(); renderTicket(); updateOtCount();
 }
 
@@ -616,7 +648,8 @@ const toLocalInput = d => { const x = new Date(d); return isNaN(x) ? '' : ymd(x)
 const dmy = d => { const y = ymd(d); return y ? y.split('-').reverse().join('/') : ''; };
 const tName = t => { const n = String(t.TicketName || t.CustomerName || '-'); return /^\d{4}-\d\d-\d\dT/.test(n) ? dmy(n) : n; };
 async function updateOtCount(){
-  try{ OT = await api('getOpenTickets'); }catch(e){ return; }
+  try{ OT = (await api('getOpenTickets')) || []; }catch(e){ return; }
+  if(!Array.isArray(OT)) OT = [];
   $('#otCount').textContent = OT.length ? `(${OT.length})` : '';
   renderOtStrip();
 }
@@ -812,7 +845,7 @@ async function viewTicket(id){
   const dt = toLocalInput(t.CreatedAt);
   $('#mBody').innerHTML = `
     <div class="grid g2" style="gap:0 14px">
-      <label class="f">ຊື່ບິນ<input id="vName" value="${esc(tName(t) === '-' ? '' : (/^\\d{4}-\\d\\d-\\d\\dT/.test(String(t.TicketName)) ? '' : t.TicketName))}"></label>
+      <label class="f">ຊື່ບິນ<input id="vName" value="${esc(/^\d{4}-\d\d-\d\dT/.test(String(t.TicketName)) ? '' : (t.TicketName || ''))}"></label>
       <label class="f">ວັນທີ-ເວລາບິນ (ແກ້ໄດ້)<input id="vDate" type="datetime-local" value="${esc(dt)}"></label>
     </div>
     <small>${esc(t.CustomerName || 'ລູກຄ້າທົ່ວໄປ')} ${esc(t.Phone || '')}</small>
