@@ -1124,5 +1124,124 @@ else { go(store.get('pos_view') || 'dash'); applyBrand(); }
   };
 })();
 </script>
+<script>
+(function(){
+  let TK = null;
+  const num = v => Number(v) || 0;
+  const tkTotal = () => TK.items.reduce((s,i) => s + num(i.quantity) * num(i.unitPrice), 0);
+
+  /* ---------- ລາຍການບິນຄ້າງ ---------- */
+  window.showOpenTickets = async function(){
+    openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+    const list = await run(() => api('getOpenTickets')); if(!list) return;
+    $('#mBody').innerHTML = list.length ? `<div class="tbl-wrap"><table><tr><th>ຊື່ບິນ</th><th>ເວລາ</th><th class="r">ຍອດ</th><th></th></tr>
+      ${list.map(t => `<tr class="click" onclick="viewTicket('${esc(t.TicketID)}')">
+        <td><b>${esc(t.TicketName || '-')}</b><br><small>${esc(t.CustomerName || '')} · ${t.ItemCount} ລາຍການ</small></td>
+        <td>${fmtDate(t.CreatedAt)}</td><td class="r num">${money(t.TotalAmount)}</td>
+        <td class="r" style="white-space:nowrap">
+          <button class="btn sm" onclick="event.stopPropagation();viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
+          <button class="btn sm" onclick="event.stopPropagation();viewTicket('${esc(t.TicketID)}',true)">ແກ້ໄຂ</button>
+          <button class="btn sm pri" onclick="event.stopPropagation();loadTicket('${esc(t.TicketID)}')">ເປີດຂາຍ</button>
+          <button class="btn sm danger" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`
+      : '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>';
+  };
+
+  /* ---------- ເບິ່ງ / ແກ້ໄຂ ---------- */
+  window.viewTicket = async function(id, edit){
+    openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+    const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
+    if(!S.products.length || !S.customers.length) await refreshBase();
+    const t = r.ticket;
+    TK = { ticketId:t.TicketID, ticketName:t.TicketName || '', customerId:t.CustomerID || '', customerName:t.CustomerName || '',
+      phone:String(t.Phone || ''), createdAt:t.CreatedAt, items:(r.items || []).map(i => ({ ...i })) };
+    edit ? tkEdit() : tkView();
+  };
+
+  function tkView(){
+    $('#mTitle').textContent = 'ບິນຄ້າງ: ' + (TK.ticketName || '-');
+    $('#mBody').innerHTML = `
+      <div style="margin-bottom:10px;font-size:14px">
+        <div><span style="color:var(--muted)">ລູກຄ້າ:</span> <b>${esc(TK.customerName || 'ລູກຄ້າທົ່ວໄປ')}</b> ${TK.phone ? '· ' + esc(TK.phone) : ''}</div>
+        <div><span style="color:var(--muted)">ເວລາພັກບິນ:</span> ${fmtDate(TK.createdAt)}</div>
+      </div>
+      <div class="tbl-wrap">${TK.items.length ? `<table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
+        ${TK.items.map(i => `<tr><td>${esc(i.productName)}</td><td class="r num">${esc(i.quantity)} ${esc(i.unit || '')}</td>
+          <td class="r num">${money(i.unitPrice)}</td><td class="r num">${money(num(i.quantity) * num(i.unitPrice))}</td></tr>`).join('')}</table>`
+        : '<div class="empty">ບິນນີ້ບໍ່ມີສິນຄ້າ</div>'}</div>
+      <div class="num" style="text-align:right;font-size:20px;font-weight:700;margin:10px 0">ລວມ ${money(tkTotal())}</div>
+      <div class="row"><button class="btn" onclick="showOpenTickets()">← ກັບຄືນ</button><span class="spacer"></span>
+        <button class="btn" onclick="tkEdit()">ແກ້ໄຂ</button>
+        <button class="btn pri" onclick="loadTicket('${esc(TK.ticketId)}')">ເປີດໃນໜ້າຂາຍ</button></div>`;
+  }
+  window.tkView = tkView;
+
+  function tkEdit(){
+    $('#mTitle').textContent = 'ແກ້ໄຂບິນຄ້າງ';
+    const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === TK.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
+    const prodOpts = S.products.map(p => `<option value="${esc(p.ProductID)}">${esc(p.ProductName)} (ເຫຼືອ ${esc(p.CurrentStock)})</option>`).join('');
+    $('#mBody').innerHTML = `
+      <label class="f">ຊື່ບິນ<input id="tkName" value="${esc(TK.ticketName)}"></label>
+      <label class="f">ລູກຄ້າ<select id="tkCust"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select></label>
+      <div class="grid g2" style="gap:0 14px">
+        <label class="f">ຊື່ລູກຄ້າ<input id="tkCName" value="${esc(TK.customerName)}"></label>
+        <label class="f">ເບີໂທ<input id="tkPhone" value="${esc(TK.phone)}"></label>
+      </div>
+      <div id="tkItems"></div>
+      <div class="row" style="margin-top:8px">
+        <select class="inp" id="tkAddSel" style="flex:1;margin:0"><option value="">+ ເພີ່ມສິນຄ້າ...</option>${prodOpts}</select>
+      </div>
+      <div id="tkTotal" class="num" style="text-align:right;font-size:20px;font-weight:700;margin:12px 0"></div>
+      <div class="row"><button class="btn" onclick="tkView()">ຍົກເລີກ</button><span class="spacer"></span>
+        <button class="btn pri" id="tkSave">ບັນທຶກ</button></div>`;
+    $('#tkName').oninput = e => TK.ticketName = e.target.value;
+    $('#tkCName').oninput = e => TK.customerName = e.target.value;
+    $('#tkPhone').oninput = e => TK.phone = e.target.value;
+    $('#tkCust').onchange = e => {
+      const c = S.customers.find(x => x.CustomerID === e.target.value);
+      TK.customerId = e.target.value; TK.customerName = c ? c.CustomerName : ''; TK.phone = c ? String(c.Phone || '') : '';
+      $('#tkCName').value = TK.customerName; $('#tkPhone').value = TK.phone;
+    };
+    $('#tkAddSel').onchange = e => {
+      const p = S.products.find(x => String(x.ProductID) === e.target.value); if(!p) return;
+      const it = TK.items.find(x => String(x.productId) === String(p.ProductID));
+      if(it) it.quantity = num(it.quantity) + 1;
+      else TK.items.push({ productId:p.ProductID, productName:p.ProductName, quantity:1, unitPrice:num(p.SellingPrice), unit:p.Unit || '' });
+      e.target.value = ''; drawItems();
+    };
+    $('#tkSave').onclick = tkSave;
+    drawItems();
+  }
+  window.tkEdit = tkEdit;
+
+  function drawTotal(){ const el = $('#tkTotal'); if(el) el.textContent = 'ລວມ ' + money(tkTotal()); }
+  function drawItems(){
+    $('#tkItems').innerHTML = TK.items.length ? `<div class="tbl-wrap"><table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th></th></tr>
+      ${TK.items.map((i,k) => `<tr><td>${esc(i.productName)}<br><small style="color:var(--muted)">${esc(i.unit || '')}</small></td>
+        <td class="r"><input class="inp inline num" type="number" min="0" step="${unitIsWeight(i.unit) ? '0.01' : '1'}" value="${esc(i.quantity)}" style="width:80px" oninput="TKset(${k},'quantity',this.value)"></td>
+        <td class="r"><input class="inp inline num" type="number" min="0" value="${esc(i.unitPrice)}" style="width:110px" oninput="TKset(${k},'unitPrice',this.value)"></td>
+        <td class="r"><button class="btn sm danger" onclick="TKdel(${k})" aria-label="ລົບ">×</button></td></tr>`).join('')}</table></div>`
+      : '<div class="empty">ຍັງບໍ່ມີສິນຄ້າ — ເລືອກສິນຄ້າດ້ານລຸ່ມ</div>';
+    drawTotal();
+  }
+  window.TKset = (k, f, v) => { TK.items[k][f] = v; drawTotal(); };
+  window.TKdel = k => { TK.items.splice(k, 1); drawItems(); };
+
+  async function tkSave(){
+    const items = TK.items.filter(i => num(i.quantity) > 0).map(i => ({ ...i, quantity:num(i.quantity), unitPrice:num(i.unitPrice) }));
+    if(!items.length) return toast('ບິນຕ້ອງມີສິນຄ້າຢ່າງໜ້ອຍ 1 ລາຍການ (ຈຳນວນ > 0)', true);
+    $('#tkSave').disabled = true;
+    const r = await run(() => api('saveOpenTicket', { ticketId:TK.ticketId, ticketName:TK.ticketName, customerId:TK.customerId,
+      customerName:TK.customerName, phone:TK.phone, items }), 'ບັນທຶກບິນຄ້າງແລ້ວ');
+    if(!r){ $('#tkSave').disabled = false; return; }
+    // ຖ້າບິນນີ້ເປີດຢູ່ໃນໜ້າຂາຍ ໃຫ້ຊິ້ງຂໍ້ມູນນຳ
+    if(cart.ticketId === TK.ticketId){
+      Object.assign(cart, { ticketName:TK.ticketName, customerId:TK.customerId, customerName:TK.customerName, phone:TK.phone, items });
+      if(CUR === 'pos') renderTicket();
+    }
+    updateOtCount();
+    viewTicket(TK.ticketId);
+  }
+})();
+</script>
 </body>
 </html>
