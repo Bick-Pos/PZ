@@ -148,8 +148,11 @@ textarea{min-height:70px;resize:vertical}
 #loader{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0;z-index:70;transition:width .3s}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ---------- mobile ---------- */
-@media (max-width:860px){
+.otc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fff}
+.otc .oti{font-size:14px;margin:6px 0 8px;padding:6px 10px;background:#F6F8F7;border-radius:8px;line-height:1.7}
+.otc .row .btn{flex:1;padding:10px 8px}
+  /* ---------- mobile ---------- */
+@media (max-width:860px){  .ot-chip .d{width:30px;height:30px;top:0;right:0;font-size:22px}
   .app{grid-template-columns:1fr}
   nav.side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;z-index:40;display:flex;overflow-x:auto;
     padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:2px}
@@ -787,7 +790,9 @@ function signPad(){
   };
 }
 
-const ticketPayload = () => ({ ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
+const ticketPayload = () => { delete OTD[cart.ticketId];
+  return { ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
+    customerName:cart.customerName, phone:cart.phone, items:cart.items, createdAt:cart.date || '' }; }; => ({ ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
   customerName:cart.customerName, phone:cart.phone, items:cart.items, createdAt:cart.date || '' });
 
 // ບັນທຶກບິນຄ້າງທີ່ກຳລັງແກ້ຢູ່ ໂດຍບໍ່ຖາມຊື່ (ໃຊ້ກ່ອນສະລັບໄປບິນອື່ນ)
@@ -816,7 +821,40 @@ async function newTicket(){
   clearCart(); updateOtCount();
 }
 
+const OTD = {};   // ເກັບລາຍການສິນຄ້າຂອງບິນຄ້າງ ບໍ່ໂຫຼດຊ້ຳ
+const itemsHtml = items => items.length
+  ? items.map(i => `• ${esc(i.productName)} × <b>${esc(i.quantity)}</b>${i.unit ? ' ' + esc(i.unit) : ''}`).join('<br>')
+  : '<small>ບໍ່ມີລາຍການ</small>';
 async function showOpenTickets(){
+  openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+  const list = await run(() => api('getOpenTickets')); if(!list) return;
+  OT = list; $('#otCount').textContent = list.length ? `(${list.length})` : ''; renderOtStrip();
+  if(!list.length){ $('#mBody').innerHTML = '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>'; return; }
+  const sorted = list.slice().sort((x, y) => new Date(otDate(y)) - new Date(otDate(x)));
+  const groups = {};
+  sorted.forEach(t => { const k = ymd(otDate(t)) || '-'; (groups[k] = groups[k] || []).push(t); });
+  $('#mBody').innerHTML = Object.keys(groups).sort().reverse().map(k => {
+    const g = groups[k], sum = g.reduce((s, t) => s + (Number(t.TotalAmount) || 0), 0);
+    return `<div class="ot-day"><b>📅 ${dmy(k) || 'ບໍ່ມີວັນທີ'}</b><span class="num">${g.length} ບິນ · ${money(sum)}</span></div>` +
+      g.map(t => `<div class="otc">
+        <div class="row" style="margin:0"><b>${esc(tName(t))}</b><span class="spacer"></span><b class="num" style="color:var(--jade)">${money(t.TotalAmount)}</b></div>
+        <small>${esc(t.CustomerName || '')} · ${t.ItemCount} ລາຍການ · ${esc(toLocalInput(otDate(t)).slice(11))}</small>
+        <div class="oti" data-oti="${esc(t.TicketID)}">${OTD[t.TicketID] ? itemsHtml(OTD[t.TicketID]) : '<small>ກຳລັງໂຫຼດລາຍການ...</small>'}</div>
+        <div class="row" style="margin:0">
+          <button class="btn" onclick="viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
+          <button class="btn pri" onclick="loadTicket('${esc(t.TicketID)}')">ແກ້ໄຂ</button>
+          <button class="btn danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></div></div>`).join('');
+  }).join('');
+  // ໂຫຼດລາຍການສິນຄ້າຂອງແຕ່ລະບິນ ແລ້ວຄ່ອຍໆເຕີມເຂົ້າ (ຍິງພ້ອມກັນບໍ່ເກີນ 3)
+  for(const t of list){
+    if(!OTD[t.TicketID]){
+      const r = await api('getOpenTicketDetail', t.TicketID).catch(() => null);
+      if(r) OTD[t.TicketID] = r.items || [];
+    }
+    const el = [...document.querySelectorAll('[data-oti]')].find(e => e.dataset.oti === String(t.TicketID));
+    if(el && OTD[t.TicketID]) el.innerHTML = itemsHtml(OTD[t.TicketID]);
+  }
+}
   openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   const list = await run(() => api('getOpenTickets')); if(!list) return;
   OT = list; $('#otCount').textContent = list.length ? `(${list.length})` : ''; renderOtStrip();
