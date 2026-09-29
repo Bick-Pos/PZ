@@ -1518,5 +1518,43 @@ async function smCust(g, from, to, my){
 if(!(store.get('pos_api_token') || DEFAULT_API_TOKEN)) { go('settings'); toast('ກະລຸນາໃສ່ລະຫັດ API ເພື່ອເລີ່ມໃຊ້ງານ'); }
 else { go(store.get('pos_view') || 'dash'); applyBrand(); }
 </script>
+  /* bill-extras.js — ເພີ່ມ ຫົວບິນ / ທ້າຍບິນ ແລະ ສະແດງຊື່ສິນຄ້າໃນໃບບິນ
+   ວິທີໃຊ້: ວາງໄຟລ໌ນີ້ໄວ້ຂ້າງ index.html ແລ້ວເພີ່ມ 1 ແຖວກ່ອນ </body>:
+   <script src="bill-extras.js"></script>                                   */
+(function(){
+  // ---- ປ່ຽນຟັງຊັນສ້າງໃບບິນ ----
+  window.receiptHtml = function(inv, items, st){
+    const sig = String(inv.Signature || '');
+    const head = store.get('pos_bill_head'), foot = store.get('pos_bill_foot') || 'ຂອບໃຈທີ່ອຸດໜູນ';
+    return `<div style="text-align:center"><b style="font-size:18px">${esc(st.ShopName || 'ຮ້ານຂອງຂ້ອຍ')}</b><br>
+      <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small>
+      ${head ? `<div style="white-space:pre-line;margin-top:6px;font-size:13px">${esc(head)}</div>` : ''}</div>
+      <hr style="border:0;border-top:1px dashed #999">
+      <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
+      <table style="margin-top:8px"><tr><th>ລາຍການສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລວມ</th></tr>
+      ${items.map(i => `<tr><td><b>${esc(i.ProductName)}</b><br><small>${esc(i.Quantity)} × ${money(i.UnitPrice)}</small></td><td class="r num">${esc(i.Quantity)}</td><td class="r num">${money(i.LineTotal)}</td></tr>`).join('')}</table>
+      <small>ທັງໝົດ ${items.length} ລາຍການ</small>
+      <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:10px"><span>ລວມທັງໝົດ</span><span class="num">${money(inv.TotalAmount)}</span></div>
+      <small>ຊຳລະ: ${esc(payLabel(inv.PaymentMethod))}${inv.PaymentMethod === 'Cash+Transfer' ? ` (ສົດ ${money(inv.CashAmount)} / ໂອນ ${money(inv.TransferAmount)})` : ''}
+        · ${inv.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ'}${inv.Note ? '<br>ໝາຍເຫດ: ' + esc(inv.Note) : ''}</small>
+      ${sig.startsWith('data:image') ? `<div style="text-align:center;margin-top:10px"><img src="${esc(sig)}" style="width:180px" alt="ລາຍເຊັນ"><br><small>ລາຍເຊັນລູກຄ້າ</small></div>` : ''}
+      ${st.QRCodeURL && inv.PaymentStatus !== 'Paid' ? `<div style="text-align:center;margin-top:10px"><img src="${esc(st.QRCodeURL)}" style="width:160px" alt="QR"><br><small>ສະແກນເພື່ອໂອນ</small></div>` : ''}
+      <hr style="border:0;border-top:1px dashed #999">
+      <div style="text-align:center;white-space:pre-line;font-size:13px">${esc(foot)}</div>`;
+  };
+
+  // ---- ເພີ່ມຊ່ອງຫົວບິນ/ທ້າຍບິນ ໃນໜ້າຕັ້ງຄ່າ (ເກັບໃນບຣາວເຊີເຄື່ອງນີ້) ----
+  const qr = document.getElementById('sQrFile');
+  if(qr && !document.getElementById('sHead')){
+    qr.closest('label').insertAdjacentHTML('beforebegin',
+      '<label class="f">ຂໍ້ຄວາມຫົວບິນ (ສະແດງກ່ອນລາຍການ ເຊັ່ນ ເລກບັນຊີ, ເວລາເປີດ-ປິດ)<textarea id="sHead"></textarea></label>' +
+      '<label class="f">ຂໍ້ຄວາມທ້າຍບິນ (ຖ້າຫວ່າງຈະໃຊ້ "ຂອບໃຈທີ່ອຸດໜູນ")<textarea id="sFoot"></textarea></label>');
+    const h = document.getElementById('sHead'), f = document.getElementById('sFoot');
+    h.value = store.get('pos_bill_head'); f.value = store.get('pos_bill_foot');
+    h.oninput = () => store.set('pos_bill_head', h.value);
+    f.oninput = () => store.set('pos_bill_foot', f.value);
+  }
+})();
 </body>
 </html>
+
