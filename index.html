@@ -457,14 +457,12 @@ function addToCart(id){
   const p = S.products.find(x => String(x.ProductID) === String(id)); if(!p) return;
   const it = cart.items.find(x => x.productId === p.ProductID);
   const next = (it ? Number(it.quantity) : 0) + 1;
-  if(next > stockOf(p.ProductID)) return toast(`"${p.ProductName}" ເຫຼືອພຽງ ${p.CurrentStock}`, true);
   if(it) it.quantity = next;
   else cart.items.push({ productId:p.ProductID, productName:p.ProductName, quantity:1, unitPrice:Number(p.SellingPrice)||0, unit:p.Unit||'' });
   renderTicket();
 }
 function setQty(k, v){
   const it = cart.items[k]; it.quantity = v;
-  if(Number(v) > stockOf(it.productId)) toast(`"${it.productName}" ເຫຼືອພຽງ ${stockOf(it.productId)} — ກະລຸນາຫຼຸດຈຳນວນ`, true);
   renderTicket();
 }
 function setPay(v){
@@ -677,7 +675,6 @@ async function checkout(){
   const total = cartTotal();
   for(const i of cart.items){
     if(!(Number(i.quantity) > 0)) return toast(`ຈຳນວນຂອງ "${i.productName}" ບໍ່ຖືກຕ້ອງ`, true);
-    if(Number(i.quantity) > stockOf(i.productId)) return toast(`"${i.productName}" ເຫຼືອພຽງ ${stockOf(i.productId)}`, true);
   }
   let cash = 0, transfer = 0;
   if(cart.pay === 'Split'){ cash = Number(cart.cash)||0; transfer = Number(cart.transfer)||0;
@@ -859,6 +856,17 @@ function exportInvoices(){
       i.CashAmount ?? '', i.TransferAmount ?? '', i.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ', i.Note])));
 }
 
+// ດຶງລາຍການສິນຄ້າຈາກຜົນ getInvoiceDetail (ຮອງຮັບຊື່ key/ຖັນທີ່ຕ່າງກັນ)
+function pickItems(r){
+  const raw = r.items || r.Items || r.details || r.lines || r.invoiceItems || r.invoice_items || [];
+  const g = (o, ...ks) => { for(const k of ks){ if(o[k] !== undefined && o[k] !== '') return o[k]; } return ''; };
+  return (Array.isArray(raw) ? raw : []).map(o => ({ ...o,
+    ProductID: g(o, 'ProductID', 'productId', 'productID'),
+    ProductName: g(o, 'ProductName', 'productName', 'name', 'Name'),
+    Quantity: g(o, 'Quantity', 'quantity', 'Qty', 'qty'),
+    UnitPrice: g(o, 'UnitPrice', 'unitPrice', 'Price', 'price'),
+    Unit: g(o, 'Unit', 'unit') }));
+}
 async function showInvoice(no){
   openModal('ໃບບິນ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   // ໃຫ້ແນ່ໃຈວ່າມີລາຍການສິນຄ້າແລ້ວ (ເພື່ອຫາໜ່ວຍນັບໃນໃບບິນ)
@@ -866,8 +874,12 @@ async function showInvoice(no){
   const [r, st] = await Promise.all([run(() => api('getInvoiceDetail', no)), api('getSettings').catch(() => ({}))]);
   if(!r) return;
   S.settings = st;
-  const inv = r.invoice;
-  $('#mBody').innerHTML = `<div id="receipt">${receiptHtml(inv, r.items, st)}</div>
+  const inv = r.invoice, items = pickItems(r);
+  console.log('getInvoiceDetail', no, r);
+  const warn = items.length ? '' : `<div style="background:var(--red-soft);color:var(--red);padding:10px;border-radius:8px;margin-bottom:10px;font-size:13px">
+    ⚠ ບໍ່ພົບລາຍການສິນຄ້າຂອງບິນນີ້ຈາກ Google Sheet (ຍອດ ${money(inv.TotalAmount)} ມີ ແຕ່ລາຍການຫວ່າງ). ກວດແທັບລາຍການໃບບິນ ແລະ ເລກບິນ ${esc(no)}.<br>
+    key ທີ່ server ສົ່ງມາ: ${esc(Object.keys(r).join(', '))}</div>`;
+  $('#mBody').innerHTML = `${warn}<div id="receipt">${receiptHtml(inv, items, st)}</div>
     <div class="row mt"><span>${statusTag(inv.PaymentStatus)}</span><span class="spacer"></span>
       <button class="btn" onclick="toggleInv('${esc(no)}','${inv.PaymentStatus === 'Paid' ? 'Unpaid' : 'Paid'}')">
         ${inv.PaymentStatus === 'Paid' ? 'ປ່ຽນເປັນຍັງບໍ່ຈ່າຍ' : 'ໝາຍວ່າຈ່າຍແລ້ວ'}</button>
@@ -882,26 +894,26 @@ function receiptHtml(inv, items, st){
   const cell = 'padding:2px 0;border-bottom:1px dotted #bbb';
   const lineOf = i => Math.round(N(i.Quantity) * N(i.UnitPrice) * 100) / 100;
   const calcSum = items.reduce((s,i) => s + lineOf(i), 0);
-  const rows = items.map((i, k) => `
-    <tr><td colspan="2" style="padding:6px 0 0;border:0"><b>${k + 1}. ${esc(i.ProductName)}</b></td></tr>
-    <tr>
-      <td class="num" style="${cell}">${esc(i.Quantity)} ${esc(i.Unit || unitOf(i.ProductID))} × ${money(i.UnitPrice)}</td>
-      <td class="r num" style="${cell}"><b>= ${money(lineOf(i))}</b></td>
-    </tr>`).join('');
+  const rm = n => '₭' + N(n).toLocaleString('de-DE', {maximumFractionDigits:2});
+  const rows = items.map(i => `
+    <div style="padding:10px 0">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px">
+        <span style="font-size:16px">${esc(i.ProductName)}</span>
+        <span class="num" style="font-size:16px;white-space:nowrap">${rm(lineOf(i))}</span>
+      </div>
+      <div class="num" style="color:#777;font-size:14px;margin-top:2px">${esc(i.Quantity)} x ${rm(i.UnitPrice)}${(i.Unit || unitOf(i.ProductID)) ? ' / ' + esc(i.Unit || unitOf(i.ProductID)) : ''}</div>
+    </div>`).join('');
   return `<div style="text-align:center"><b style="font-size:18px">${esc(st.ShopName || 'ຮ້ານຂອງຂ້ອຍ')}</b><br>
     <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small>
     ${head ? `<div style="white-space:pre-line;margin-top:6px;font-size:13px">${esc(head)}</div>` : ''}</div>
     <hr style="border:0;border-top:1px dashed #999">
     <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ/ເວລາ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
-    <table style="margin-top:8px;width:100%;border-collapse:collapse">
-      <tr><th style="text-align:left">ລາຍການ / ຈຳນວນ × ລາຄາ</th><th class="r">ເປັນເງິນ</th></tr>
-      ${rows}
-    </table>
-    ${Math.abs(calcSum - N(inv.TotalAmount)) > 0.01 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px"><span>ລວມລາຍການ</span><span class="num">${money(calcSum)}</span></div>` : ''}
-    <div style="border-top:1px dashed #999;margin-top:8px;padding-top:6px;font-size:12px">
+    <div style="border-top:1px solid #ddd;border-bottom:1px solid #ddd;margin-top:8px">${rows}</div>
+    ${Math.abs(calcSum - N(inv.TotalAmount)) > 0.01 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px"><span>ລວມລາຍການ</span><span class="num">${rm(calcSum)}</span></div>` : ''}
+    <div style="margin-top:8px;font-size:12px;color:#777">
       ທັງໝົດ ${items.length} ລາຍການ · ຈຳນວນລວມ ${qtySum}</div>
-    <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:6px">
-      <span>ລວມທັງໝົດ</span><span class="num">${money(inv.TotalAmount)}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:20px;font-weight:700;margin-top:6px">
+      <span>ລວມທັງໝົດ</span><span class="num">${rm(inv.TotalAmount)}</span></div>
     <small>ຊຳລະ: ${esc(payLabel(inv.PaymentMethod))}${inv.PaymentMethod === 'Cash+Transfer' ? ` (ສົດ ${money(inv.CashAmount)} / ໂອນ ${money(inv.TransferAmount)})` : ''}
       · ${inv.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ'}${inv.Note ? '<br>ໝາຍເຫດ: ' + esc(inv.Note) : ''}</small>
     ${sig.startsWith('data:image') ? `<div style="text-align:center;margin-top:10px"><img src="${esc(sig)}" style="width:180px" alt="ລາຍເຊັນ"><br><small>ລາຍເຊັນລູກຄ້າ</small></div>` : ''}
@@ -929,7 +941,7 @@ async function invoiceEditForm(no){
       <label class="f">ເບີໂທ<input id="ePhone" value="${esc(inv.Phone)}"></label>
     </div>
     <div class="tbl-wrap"><table id="eItems"><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th></tr>
-      ${r.items.map(i => `<tr data-pid="${esc(i.ProductID)}"><td>${esc(i.ProductName)}</td>
+      ${pickItems(r).map(i => `<tr data-pid="${esc(i.ProductID)}"><td>${esc(i.ProductName)}</td>
         <td class="r"><input class="inp inline num eQ" type="number" step="any" min="0" value="${esc(i.Quantity)}" style="width:80px"></td>
         <td class="r"><input class="inp inline num eP" type="number" min="0" value="${esc(i.UnitPrice)}" style="width:110px"></td></tr>`).join('')}</table></div>
     <div id="eTotal" class="num" style="text-align:right;font-weight:700;margin:8px 0 12px"></div>
