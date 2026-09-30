@@ -880,12 +880,13 @@ function receiptHtml(inv, items, st){
   const foot = store.get('pos_bill_foot') || 'ຂອບໃຈທີ່ອຸດໜູນ';
   const qtySum = items.reduce((s,i) => s + N(i.Quantity), 0);
   const cell = 'padding:2px 0;border-bottom:1px dotted #bbb';
+  const lineOf = i => Math.round(N(i.Quantity) * N(i.UnitPrice) * 100) / 100;
+  const calcSum = items.reduce((s,i) => s + lineOf(i), 0);
   const rows = items.map((i, k) => `
-    <tr><td colspan="3" style="padding:5px 0 0;border:0"><b>${k + 1}. ${esc(i.ProductName)}</b></td></tr>
+    <tr><td colspan="2" style="padding:6px 0 0;border:0"><b>${k + 1}. ${esc(i.ProductName)}</b></td></tr>
     <tr>
-      <td class="num" style="${cell}">${esc(i.Quantity)} ${esc(i.Unit || unitOf(i.ProductID))}</td>
-      <td class="r num" style="${cell}">@ ${money(i.UnitPrice)}</td>
-      <td class="r num" style="${cell}"><b>${money(i.LineTotal ?? N(i.Quantity) * N(i.UnitPrice))}</b></td>
+      <td class="num" style="${cell}">${esc(i.Quantity)} ${esc(i.Unit || unitOf(i.ProductID))} × ${money(i.UnitPrice)}</td>
+      <td class="r num" style="${cell}"><b>= ${money(lineOf(i))}</b></td>
     </tr>`).join('');
   return `<div style="text-align:center"><b style="font-size:18px">${esc(st.ShopName || 'ຮ້ານຂອງຂ້ອຍ')}</b><br>
     <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small>
@@ -893,9 +894,10 @@ function receiptHtml(inv, items, st){
     <hr style="border:0;border-top:1px dashed #999">
     <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ/ເວລາ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
     <table style="margin-top:8px;width:100%;border-collapse:collapse">
-      <tr><th style="text-align:left">ຈຳນວນ</th><th class="r">ລາຄາຂາຍ/ໜ່ວຍ</th><th class="r">ລວມ</th></tr>
+      <tr><th style="text-align:left">ລາຍການ / ຈຳນວນ × ລາຄາ</th><th class="r">ເປັນເງິນ</th></tr>
       ${rows}
     </table>
+    ${Math.abs(calcSum - N(inv.TotalAmount)) > 0.01 ? `<div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px"><span>ລວມລາຍການ</span><span class="num">${money(calcSum)}</span></div>` : ''}
     <div style="border-top:1px dashed #999;margin-top:8px;padding-top:6px;font-size:12px">
       ທັງໝົດ ${items.length} ລາຍການ · ຈຳນວນລວມ ${qtySum}</div>
     <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:6px">
