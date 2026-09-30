@@ -1,1187 +1,1199 @@
 <!DOCTYPE html>
 <html lang="lo">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ລະບົບ POS ແລະ ຄຸ້ມຄອງສະຕັອກສິນຄ້າ</title>
-  <style>
-    :root {
-      --bg: #F4F6F8;
-      --panel: #FFFFFF;
-      --pri: #10B981;
-      --pri-dark: #059669;
-      --txt: #1F2937;
-      --muted: #6B7280;
-      --border: #E5E7EB;
-      --red: #EF4444;
-      --jade: #059669;
-      --gold: #D97706;
-    }
-    * { box-sizing: border-box; font-family: 'Phetsarath OT', 'Noto Sans Lao', sans-serif; }
-    body { margin: 0; padding: 0; background: var(--bg); color: var(--txt); }
-    .row { display: flex; align-items: center; gap: 8px; }
-    .grid { display: grid; gap: 12px; }
-    .g2 { grid-template-columns: repeat(2, 1fr); }
-    .g3 { grid-template-columns: repeat(3, 1fr); }
-    .mt { margin-top: 12px; }
-    .panel { background: var(--panel); border-radius: 8px; padding: 16px; border: 1px solid var(--border); }
-    .btn { padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-size: 14px; }
-    .btn.pri { background: var(--pri); color: #fff; border: none; }
-    .btn.pri:hover { background: var(--pri-dark); }
-    .btn.danger { background: var(--red); color: #fff; border: none; }
-    .btn.sm { padding: 4px 8px; font-size: 12px; }
-    .inp, input, select, textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; outline: none; }
-    .f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 500; }
-    .r { text-align: right; }
-    .num { font-family: monospace; }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    th, td { padding: 8px; border-bottom: 1px solid var(--border); text-align: left; font-size: 13px; }
-    th { background: #F9FAFB; font-weight: 600; }
-    .thumb { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: #EEE; }
-    .tag { padding: 2px 6px; border-radius: 4px; font-size: 11px; }
-    .tag.in { background: #D1FAE5; color: #065F46; }
-    .tag.out { background: #FEF3C7; color: #92400E; }
-    .tag.paid { background: #D1FAE5; color: #065F46; }
-    .tag.unpaid { background: #FEE2E2; color: #991B1B; }
-    .empty { text-align: center; padding: 24px; color: var(--muted); }
-    .spacer { flex: 1; }
-    
-    /* Modal Header & Overlay */
-    #modalOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
-    #modalBox { background: #fff; border-radius: 8px; width: 90%; max-width: 500px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-    #toast { position: fixed; bottom: 20px; right: 20px; background: #333; color: #fff; padding: 10px 20px; border-radius: 6px; display: none; z-index: 1001; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ລະບົບຫຼັງຮ້ານ POS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF2EF; --paper:#FFFFFF; --ink:#1B2A24; --muted:#5E6E67; --line:#D5DDD8;
+  --jade:#0E7C5A; --jade-soft:#DDF0E8; --gold:#C8961A; --gold-soft:#FBF1D6;
+  --red:#B4232C; --red-soft:#FBE3E4; --radius:10px;
+  --font:"Noto Sans Lao Looped","Noto Sans Lao","Phetsarath OT",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--ink);font-size:15px;line-height:1.55;
+  padding-top:env(safe-area-inset-top,0px)}
+button,input,select,textarea{font:inherit;color:inherit}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--jade)}
+
+/* ---------- layout ---------- */
+.app{display:grid;grid-template-columns:220px 1fr;min-height:100%}
+nav.side{background:var(--ink);color:#E8EFEB;padding:20px 12px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{font-weight:700;font-size:18px;padding:4px 10px 18px;border-bottom:1px solid #33463e;margin-bottom:12px}
+.brand small{display:block;font-weight:400;font-size:12px;color:#9FB3AA}
+nav.side button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;
+  padding:10px 12px;border-radius:8px;color:#CFDCD5;cursor:pointer}
+nav.side button:hover{background:#27392F}
+nav.side button.active{background:var(--jade);color:#fff}
+nav.side .ico{width:22px;text-align:center}
+main{padding:24px clamp(14px,3vw,36px) 90px;min-width:0}
+h1{font-size:24px;margin:0 0 18px;font-weight:700}
+h2{font-size:17px;margin:0 0 12px;font-weight:600}
+.view{display:none}.view.active{display:block}
+
+/* ---------- blocks ---------- */
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.grid{display:grid;gap:16px}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.stat .lbl{color:var(--muted);font-size:13px}
+.stat .val{font-size:26px;font-weight:700}
+.stat .sub{font-size:13px;color:var(--muted)}
+.stat.warn{border-color:#E7B8BB;background:var(--red-soft)}
+.mt{margin-top:16px}
+
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+th{font-weight:600;color:var(--muted);font-size:13px;background:#F6F8F7}
+td.r,th.r{text-align:right}
+tr.click{cursor:pointer}tr.click:hover td{background:#F4F8F6}
+
+.btn{border:1px solid var(--line);background:var(--paper);padding:8px 14px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--jade)}
+.btn.pri{background:var(--jade);border-color:var(--jade);color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:#fff}
+.btn.danger{color:var(--red);border-color:#E7B8BB}
+.btn.sm{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:wait}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+
+label.f{display:block;font-size:13px;color:var(--muted);margin-bottom:10px}
+label.f input,label.f select,label.f textarea,.inp{display:block;width:100%;margin-top:4px;padding:9px 11px;
+  border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+.inp.inline{display:inline-block;width:auto;margin:0}
+textarea{min-height:70px;resize:vertical}
+
+.tag{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12px;font-weight:600}
+.tag.paid{background:var(--jade-soft);color:var(--jade)}
+.tag.unpaid{background:var(--red-soft);color:var(--red)}
+.tag.in{background:var(--jade-soft);color:var(--jade)}
+.tag.out{background:var(--gold-soft);color:#8a6510}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.thumb{width:40px;height:40px;border-radius:6px;object-fit:cover;background:#E4EAE6}
+
+/* ---------- POS ---------- */
+.pos{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+.pcard{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:8px;cursor:pointer;text-align:left}
+.pcard:hover{border-color:var(--jade)}
+.pcard img,.pcard .noimg{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#E4EAE6;display:block}
+.pcard .noimg{display:grid;place-items:center;font-size:28px;color:#9FB3AA}
+.pcard .nm{font-weight:600;font-size:14px;margin-top:6px;line-height:1.35}
+.pcard .pr{color:var(--jade);font-weight:700}
+.pcard .st{font-size:12px;color:var(--muted)}
+.pcard.low .st{color:var(--red)}
+
+/* the ticket: paper slip with perforated bottom */
+.ticket{background:var(--paper);border-radius:12px 12px 0 0;padding:18px 18px 26px;position:sticky;top:16px;
+  box-shadow:0 1px 0 var(--line),0 12px 30px -18px rgba(27,42,36,.45);
+  -webkit-mask:radial-gradient(circle 7px at 50% 100%,#0000 98%,#000) 50% 100%/18px 100% repeat-x;
+          mask:radial-gradient(circle 7px at 50% 100%,#0000 98%,#000) 50% 100%/18px 100% repeat-x}
+.ticket .head{border-bottom:2px dashed var(--line);padding-bottom:10px;margin-bottom:10px}
+.ticket .line{display:grid;grid-template-columns:1fr 70px 88px 24px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px dotted var(--line)}
+.ticket .line input{padding:5px 6px;border:1px solid var(--line);border-radius:6px;width:100%;text-align:right}
+.ticket .line .x{background:none;border:0;color:var(--red);cursor:pointer;font-size:18px}
+.ticket .total{display:flex;justify-content:space-between;font-size:22px;font-weight:700;padding:12px 0;border-top:2px dashed var(--line);margin-top:8px}
+.ticket .lines{max-height:40vh;overflow:auto}
+
+/* ---------- modal & toast ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(20,30,26,.5);display:none;align-items:flex-start;justify-content:center;
+  padding:max(24px,env(safe-area-inset-top,0px)) 12px 24px;z-index:50;overflow:auto}
+.modal-bg.open{display:flex}
+.modal{background:var(--paper);border-radius:14px;width:min(640px,100%);padding:20px;animation:pop .16s ease-out}
+.modal .mh{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal .mh h2{margin:0}
+.modal .close{background:none;border:0;font-size:24px;cursor:pointer;color:var(--muted)}
+@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;z-index:60;display:none;max-width:90vw}
+#toast.err{background:var(--red)}
+#loader{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0;z-index:70;transition:width .3s}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- mobile ---------- */
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  nav.side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;z-index:40;display:flex;overflow-x:auto;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:2px}
+  .brand{display:none}
+  nav.side button{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;min-width:64px;align-items:center;text-align:center}
+  nav.side .ico{font-size:18px}
+  .pos{grid-template-columns:1fr}
+  .ticket{position:static;order:-1;margin-bottom:6px}
+  .ticket .lines{max-height:34vh}
+  main{padding-bottom:110px}
+}
+</style>
 </head>
 <body>
+<div id="loader"></div>
+<div class="app">
+  <nav class="side" id="nav">
+    <div class="brand" id="brandName">ລະບົບຫຼັງຮ້ານ<small id="brandSub">POS Back-office</small></div>
+    <button data-v="dash"><span class="ico">📊</span>ພາບລວມ</button>
+    <button data-v="pos"><span class="ico">🧾</span>ຂາຍສິນຄ້າ</button>
+    <button data-v="products"><span class="ico">📦</span>ສິນຄ້າ</button>
+    <button data-v="stock"><span class="ico">🔁</span>ເຂົ້າ-ອອກສະຕັອກ</button>
+    <button data-v="invoices"><span class="ico">📄</span>ໃບບິນ</button>
+    <button data-v="customers"><span class="ico">👥</span>ລູກຄ້າ</button>
+    <button data-v="debts"><span class="ico">📒</span>ໜີ້ລູກຄ້າ</button>
+    <button data-v="settings"><span class="ico">⚙️</span>ຕັ້ງຄ່າ</button>
+  </nav>
 
-<div id="toast"></div>
+  <main>
+    <!-- DASHBOARD -->
+    <section class="view" id="v-dash">
+      <div class="row"><h1>ພາບລວມຮ້ານ</h1><span class="spacer"></span><button class="btn" onclick="loadDash()">ໂຫຼດໃໝ່</button></div>
+      <div id="dashBody"><div class="empty">ກຳລັງໂຫຼດ...</div></div>
+    </section>
 
-<!-- Modal Dialog -->
-<div id="modalOverlay">
-  <div id="modalBox">
-    <div class="row" style="margin-bottom: 12px;">
-      <h3 id="modalTitle" style="margin: 0;"></h3>
-      <span class="spacer"></span>
-      <button class="btn sm" onclick="closeModal()">✕</button>
-    </div>
-    <div id="modalBody"></div>
-  </div>
+    <!-- POS -->
+    <section class="view" id="v-pos">
+      <div class="pos">
+        <div>
+          <div class="row" style="margin-bottom:14px">
+            <h1 style="margin:0">ຂາຍສິນຄ້າ</h1><span class="spacer"></span>
+            <button class="btn" onclick="showOpenTickets()">ບິນຄ້າງ <span id="otCount"></span></button>
+          </div>
+          <input class="inp" id="posSearch" placeholder="ຄົ້ນຫາຊື່ສິນຄ້າ ຫຼື SKU" style="margin-bottom:14px">
+          <div class="pgrid" id="posGrid"></div>
+        </div>
+        <div class="ticket" id="ticket"></div>
+      </div>
+    </section>
+
+    <!-- PRODUCTS -->
+    <section class="view" id="v-products">
+      <div class="row"><h1>ສິນຄ້າ</h1><span class="spacer"></span><button class="btn pri" onclick="productForm()">+ ເພີ່ມສິນຄ້າ</button></div>
+      <div class="row" style="margin-bottom:14px"><input class="inp" id="prodSearch" placeholder="ຄົ້ນຫາຊື່, SKU, ປະເພດ" style="flex:1;min-width:200px;margin:0">
+        <select class="inp inline" id="prodFilter" aria-label="ກັ່ນຕອງ"></select><button class="btn" onclick="exportProducts()">ດາວໂຫຼດ CSV</button></div>
+      <div class="panel tbl-wrap" id="prodTable"></div>
+    </section>
+
+    <!-- STOCK -->
+    <section class="view" id="v-stock">
+      <div class="row"><h1>ເຂົ້າ-ອອກສະຕັອກ</h1><span class="spacer"></span><button class="btn pri" onclick="stockForm()">+ ບັນທຶກລາຍການ</button></div>
+      <div class="row" style="margin-bottom:14px">
+        <input class="inp" id="sxSearch" placeholder="ຄົ້ນຫາສິນຄ້າ ຫຼື ໝາຍເຫດ" style="flex:1;min-width:180px;margin:0">
+        <select class="inp inline" id="sxType"><option value="all">ທຸກປະເພດ</option><option value="Stock In">ເຂົ້າ</option><option value="Stock Out">ອອກ</option></select>
+        <input class="inp inline" type="date" id="sxFrom" title="ແຕ່ວັນທີ"><input class="inp inline" type="date" id="sxTo" title="ເຖິງວັນທີ">
+        <button class="btn" onclick="exportStock()">ດາວໂຫຼດ CSV</button></div>
+      <div class="panel tbl-wrap" id="stockTable"></div>
+    </section>
+
+    <!-- INVOICES -->
+    <section class="view" id="v-invoices">
+      <div class="row"><h1>ໃບບິນ</h1><span class="spacer"></span>
+        <select class="inp inline" id="invFilter"><option value="all">ທັງໝົດ</option><option value="Unpaid">ຍັງບໍ່ຈ່າຍ</option><option value="Paid">ຈ່າຍແລ້ວ</option></select>
+      </div>
+      <div class="row" style="margin-bottom:14px">
+        <input class="inp" id="invSearch" placeholder="ຄົ້ນຫາເລກບິນ, ລູກຄ້າ, ເບີໂທ" style="flex:1;min-width:180px;margin:0">
+        <select class="inp inline" id="invPay"><option value="all">ທຸກວິທີຊຳລະ</option><option value="Cash">ເງິນສົດ</option><option value="Transfer">ເງິນໂອນ</option><option value="Cash+Transfer">ສົດ + ໂອນ</option></select>
+        <input class="inp inline" type="date" id="invFrom" title="ແຕ່ວັນທີ"><input class="inp inline" type="date" id="invTo" title="ເຖິງວັນທີ">
+        <button class="btn" onclick="exportInvoices()">ດາວໂຫຼດ CSV</button></div>
+      <div class="panel tbl-wrap" id="invTable"></div>
+    </section>
+
+    <!-- CUSTOMERS -->
+    <section class="view" id="v-customers">
+      <div class="row"><h1>ລູກຄ້າ</h1><span class="spacer"></span><button class="btn pri" onclick="customerForm()">+ ເພີ່ມລູກຄ້າ</button></div>
+      <input class="inp" id="custSearch" placeholder="ຄົ້ນຫາຊື່ ຫຼື ເບີໂທ" style="margin-bottom:14px">
+      <div class="panel tbl-wrap" id="custTable"></div>
+    </section>
+
+    <!-- DEBTS -->
+    <section class="view" id="v-debts">
+      <div class="row"><h1>ໜີ້ລູກຄ້າ</h1><span class="spacer"></span>
+        <select class="inp inline" id="debtBook" title="ເລືອກປຶ້ມໜີ້">
+          <option value="1">ປຶ້ມໜີ້ 1</option><option value="2">ປຶ້ມໜີ້ 2</option><option value="3">ປຶ້ມໜີ້ 3</option>
+        </select>
+        <button class="btn pri" onclick="debtForm()">+ ບັນທຶກໜີ້</button>
+      </div>
+      <div id="debtSummary" class="grid g3" style="margin-bottom:16px"></div>
+      <div class="row" style="margin-bottom:14px">
+        <input class="inp" id="debtSearch" placeholder="ພິມຊື່ລູກຄ້າ ເພື່ອເບິ່ງຍອດລວມ" style="flex:1;min-width:200px">
+        <select class="inp inline" id="debtFilter"><option value="all">ທັງໝົດ</option><option value="Unpaid">ຍັງຄ້າງ</option><option value="Paid">ຈ່າຍແລ້ວ</option></select>
+        <button class="btn" onclick="debtCustomerSummary()">ເບິ່ງຍອດລູກຄ້າ</button>
+        <button class="btn" onclick="exportDebts()">ດາວໂຫຼດ CSV</button>
+      </div>
+      <div class="panel tbl-wrap" id="debtTable"></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="view" id="v-settings">
+      <h1>ຕັ້ງຄ່າ</h1>
+      <div class="grid g2">
+        <div class="panel">
+          <h2>ການເຊື່ອມຕໍ່ Google Sheets</h2>
+          <label class="f">URL ຂອງ Web App (ລົງທ້າຍດ້ວຍ /exec)<input id="cfgUrl" placeholder="https://script.google.com/macros/s/.../exec"></label>
+          <label class="f">ລະຫັດ API (API_TOKEN ໃນ Api.gs)<input id="cfgToken" type="password"></label>
+          <button class="btn pri" onclick="saveConn()">ບັນທຶກ ແລະ ທົດສອບ</button>
+          <p class="sub" style="font-size:13px;color:var(--muted)">ຂໍ້ມູນນີ້ເກັບໄວ້ໃນບຣາວເຊີເຄື່ອງນີ້ເທົ່ານັ້ນ.</p>
+        </div>
+        <div class="panel">
+          <h2>ຂໍ້ມູນຮ້ານ</h2>
+          <label class="f">ຊື່ຮ້ານ<input id="sName"></label>
+          <label class="f">ເບີໂທ<input id="sPhone"></label>
+          <label class="f">ທີ່ຢູ່<input id="sAddr"></label>
+          <label class="f">ຂໍ້ຄວາມຫົວບິນ (ເຊັ່ນ ເລກບັນຊີ, ເວລາເປີດ-ປິດ)<textarea id="sHead"></textarea></label>
+          <label class="f">ຂໍ້ຄວາມທ້າຍບິນ (ຫວ່າງ = ຂອບໃຈທີ່ອຸດໜູນ)<textarea id="sFoot"></textarea></label>
+          <label class="f">ຮູບ QR ຮັບເງິນໂອນ<input type="file" id="sQrFile" accept="image/*"></label>
+          <div id="sQrPrev"></div>
+          <label class="f">Gemini API Key (ສຳລັບອ່ານຮູບໃບໜີ້ດ້ວຍ AI) <span id="sKeyState"></span>
+            <input id="sKey" type="password" placeholder="ປ່ອຍຫວ່າງ = ບໍ່ປ່ຽນ"></label>
+          <button class="btn pri" onclick="saveShop()">ບັນທຶກຂໍ້ມູນຮ້ານ</button>
+        </div>
+        <div class="panel">
+          <div class="row"><h2 style="margin:0">ໜ່ວຍນັບ</h2><span class="spacer"></span><button class="btn sm" onclick="unitForm()">+ ເພີ່ມ</button></div>
+          <div id="unitList" class="mt"></div>
+        </div>
+        <div class="panel">
+          <h2>ກວດສອບລະບົບ</h2>
+          <p style="font-size:13px;color:var(--muted);margin-top:0">ກວດວ່າເຊື່ອມກັບ Google Sheet ຖືກໄຟລ໌ ແລະ ອ່ານຂໍ້ມູນແຕ່ລະແທັບໄດ້</p>
+          <button class="btn" onclick="runDebug()">ກວດສອບດຽວນີ້</button>
+          <pre id="dbgOut" style="white-space:pre-wrap;font-size:12px;max-height:320px;overflow:auto;margin-bottom:0"></pre>
+        </div>
+      </div>
+    </section>
+  </main>
 </div>
 
+<div class="modal-bg" id="modalBg"><div class="modal" role="dialog" aria-modal="true">
+  <div class="mh"><h2 id="mTitle"></h2><button class="close" onclick="closeModal()" aria-label="ປິດ">×</button></div>
+  <div id="mBody"></div>
+</div></div>
+<div id="toast"></div>
+
 <script>
-/* ======================= SYSTEM UTILS & STATE ======================= */
-const DEFAULT_API_URL = '';
-const DEFAULT_API_TOKEN = '';
-
+/* ======================= CONFIG / API ======================= */
+// URL ເລີ່ມຕົ້ນຂອງ Web App (ປ່ຽນໄດ້ໃນໜ້າຕັ້ງຄ່າ)
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwrHaN5ImI-TJ7dTJ0IzR6cAgo3LZg87Hu9fbRY44607Y9u5Npidc0fz1-iGOie9Ww2PA/exec';
+const DEFAULT_API_TOKEN = '123';
 const store = {
-  get: (k) => localStorage.getItem(k),
-  set: (k, v) => localStorage.setItem(k, v)
+  get(k){ try{ return localStorage.getItem(k) || '' }catch(e){ return '' } },
+  set(k,v){ try{ localStorage.setItem(k,v) }catch(e){} }
 };
+let pending = 0;
+function busy(d){ pending += d; const l = document.getElementById('loader'); l.style.width = pending > 0 ? '70%' : '0'; }
 
-let S = {
-  products: [],
-  customers: [],
-  units: [],
-  settings: {}
-};
-
-let cart = newCart();
-
-function newCart() {
-  return {
-    ticketId: null,
-    ticketName: '',
-    items: [],
-    customerId: '',
-    customerName: 'ລູກຄ້າທົ່ວໄປ',
-    phone: '',
-    pay: 'Cash',
-    received: 0
-  };
-}
-
-function $(s) { return document.querySelector(s); }
-function esc(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function norm(str) { return String(str || '').toLowerCase(); }
-function money(val) { return Number(val || 0).toLocaleString() + ' ₭'; }
-function N(val) { return Number(val || 0); }
-function today() { return new Date().toISOString().split('T')[0]; }
-function fmtDate(d) { if(!d) return '-'; const dt = new Date(d); return dt.toLocaleString('lo-LA'); }
-function fmtDay(d) { if(!d) return '-'; const dt = new Date(d); return dt.toLocaleDateString('lo-LA'); }
-
-function toast(msg, isErr = false) {
-  const t = $('#toast');
-  t.textContent = msg;
-  t.style.background = isErr ? 'var(--red)' : '#333';
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, 3000);
-}
-
-function openModal(title, bodyHtml) {
-  $('#modalTitle').textContent = title;
-  $('#modalBody').innerHTML = bodyHtml;
-  $('#modalOverlay').style.display = 'flex';
-}
-
-function closeModal() {
-  $('#modalOverlay').style.display = 'none';
-}
-
-function statusTag(st) {
-  if (st === 'Paid' || st === 'ຊຳລະແລ້ວ') return '<span class="tag paid">ຊຳລະແລ້ວ</span>';
-  return '<span class="tag unpaid">ຕິດໜີ້</span>';
-}
-
-function unitOf(pid) {
-  const p = S.products.find(x => String(x.ProductID) === String(pid));
-  return p ? (p.Unit || '') : '';
-}
-
-function inRange(dateStr, fromStr, toStr) {
-  if (!dateStr) return true;
-  const d = dateStr.split('T')[0];
-  if (fromStr && d < fromStr) return false;
-  if (toStr && d > toStr) return false;
-  return true;
-}
-
-function downloadCSV(filename, rows) {
-  const processRow = function (row) {
-    let finalVal = '';
-    for (let j = 0; j < row.length; j++) {
-      let innerValue = row[j] === null || row[j] === undefined ? '' : row[j].toString();
-      let result = innerValue.replace(/"/g, '""');
-      if (result.search(/("|,|\n)/g) >= 0) result = '"' + result + '"';
-      if (j > 0) finalVal += ',';
-      finalVal += result;
+async function api(fn, ...args){
+  const url = store.get('pos_api_url') || DEFAULT_API_URL, token = store.get('pos_api_token') || DEFAULT_API_TOKEN;
+  if(!url){ go('settings'); throw new Error('ກະລຸນາຕັ້ງຄ່າ URL ຂອງ Web App ກ່ອນ'); }
+  busy(1);
+  try{
+    const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({ token, fn, args }) });
+    const txt = await res.text();
+    let j;
+    try{ j = JSON.parse(txt); }
+    catch(e){
+      const m = txt.match(/<title>([^<]*)<\/title>/i);
+      const t = (m ? m[1] : txt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 120);
+      console.error('Apps Script ສົ່ງ HTML ກັບມາ (' + fn + '):', txt.slice(0, 1000));
+      throw new Error('Apps Script ຕອບເປັນ HTML ບໍ່ແມ່ນ JSON [' + fn + ']: ' + t);
     }
-    return finalVal + '\n';
-  };
-  let csvFile = '\uFEFF';
-  for (let i = 0; i < rows.length; i++) {
-    csvFile += processRow(rows[i]);
-  }
-  const blob = new Blob([csvFile], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+    if(!j.ok) throw new Error(j.error || 'ເກີດຂໍ້ຜິດພາດ');
+    return j.data;
+  }catch(e){
+    if(e instanceof TypeError) throw new Error('ເຊື່ອມຕໍ່ບໍ່ໄດ້: ກວດ URL ແລະ ການ Deploy (Anyone)');
+    throw e;
+  }finally{ busy(-1) }
 }
 
-function fileToBase64(file) {
+/* ======================= HELPERS ======================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const N = v => Number(v) || 0;
+const money = n => N(n).toLocaleString('en-US', {maximumFractionDigits:2}) + ' ₭';
+const fmtDate = d => { if(!d) return ''; const x = new Date(d); return isNaN(x) ? esc(d) : x.toLocaleDateString('en-GB') + ' ' + x.toTimeString().slice(0,5); };
+const fmtDay = d => { if(!d) return ''; const x = new Date(d); return isNaN(x) ? esc(d) : x.toLocaleDateString('en-GB'); };
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const pad2 = n => String(n).padStart(2, '0');
+const ymd = d => { const x = new Date(d); return isNaN(x) ? '' : x.getFullYear() + '-' + pad2(x.getMonth()+1) + '-' + pad2(x.getDate()); };
+const inRange = (d, from, to) => { const y = ymd(d); return (!from || y >= from) && (!to || y <= to); };
+// ປັບຕົວອັກສອນລາວ (ຫນ→ໜ, ຫມ→ໝ) ເພື່ອຄົ້ນຫາໃຫ້ເຈິ
+const norm = s => String(s ?? '').normalize('NFC').toLowerCase()
+  .replace(/\u0EAB\u0E99/g, '\u0EDC').replace(/\u0EAB\u0EA1/g, '\u0EDD').replace(/[\u200B-\u200D\uFEFF\s]+/g, ' ').trim();
+function downloadCSV(name, rows){
+  const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+}
+const statusTag = s => s === 'Paid' ? '<span class="tag paid">ຈ່າຍແລ້ວ</span>' : '<span class="tag unpaid">ຍັງບໍ່ຈ່າຍ</span>';
+
+function toast(msg, err){ const t = $('#toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block';
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.style.display = 'none', 3200); }
+async function run(fn, okMsg){ try{ const r = await fn(); if(r && r.success === false) throw new Error(r.message); if(okMsg) toast(okMsg); return r; }
+  catch(e){ toast(e.message, true); return null; } }
+
+function openModal(title, html){ $('#mTitle').textContent = title; $('#mBody').innerHTML = html; $('#modalBg').classList.add('open'); }
+function closeModal(){ $('#modalBg').classList.remove('open'); }
+$('#modalBg').addEventListener('click', e => { if(e.target.id === 'modalBg') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeModal(); });
+
+// ຫຍໍ້ຮູບກ່ອນສົ່ງ (ປະຢັດເນັດ ແລະ ໄວຂຶ້ນ)
+function fileToBase64(file, maxDim = 1600){
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve({ base64: reader.result });
-    reader.onerror = error => reject(error);
+    const img = new Image(), fr = new FileReader();
+    fr.onload = () => { img.src = fr.result; };
+    fr.onerror = reject;
+    img.onload = () => {
+      const k = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width*k); c.height = Math.round(img.height*k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve({ base64: c.toDataURL('image/jpeg', .85).split(',')[1], mime:'image/jpeg' });
+    };
+    img.onerror = () => reject(new Error('ອ່ານຮູບບໍ່ໄດ້'));
+    fr.readAsDataURL(file);
   });
 }
 
-async function api(action, ...args) {
-  const url = store.get('pos_api_url') || DEFAULT_API_URL;
-  const token = store.get('pos_api_token') || DEFAULT_API_TOKEN;
-  if (!url) throw new Error('ກະລຸນາຕັ້ງຄ່າ URL API ໃນເມນູຕັ້ງຄ່າກ່ອນ');
+/* ======================= STATE / NAV ======================= */
+let S = { products:[], units:[], customers:[], settings:{} };
+const unitIsWeight = name => { const u = S.units.find(x => x.UnitName === name); return !!u && (u.IsWeight === true || String(u.IsWeight).toLowerCase() === 'true'); };
+const unitOf = pid => { const p = S.products.find(x => String(x.ProductID) === String(pid)); return p ? (p.Unit || '') : ''; };
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, token, args })
-  });
-  const res = await resp.json();
-  if (!res.success) throw new Error(res.message || 'ເກີດຂໍ້ຜິດພາດໃນການເຊື່ອມຕໍ່');
-  return res.data;
+const loaders = { dash:loadDash, pos:loadPos, products:loadProducts, stock:loadStock, invoices:loadInvoices,
+  customers:loadCustomers, debts:loadDebts, settings:loadSettings };
+let CUR = 'dash';
+function reloadActive(){ loaders[CUR] && loaders[CUR]().catch(e => toast(e.message, true)); }
+function go(v){
+  CUR = v;
+  document.querySelectorAll('.view').forEach(x => x.classList.toggle('active', x.id === 'v-' + v));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  store.set('pos_view', v);
+  window.scrollTo(0,0);
+  loaders[v] && loaders[v]().catch(e => toast(e.message, true));
+}
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => go(b.dataset.v));
+
+async function refreshBase(){
+  const [p, u, c] = await Promise.all([api('getProducts'), api('getUnits'), api('getCustomers')]);
+  S.products = p; S.units = u; S.customers = c;
 }
 
-async function run(fn, msg = null) {
-  try {
-    const res = await fn();
-    if (msg) toast(msg);
-    return res;
-  } catch (e) {
-    toast(e.message, true);
-    return null;
-  }
-}
+/* ======================= DASHBOARD ======================= */
+const topTable = list => list.length ? `<table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ຍອດ</th></tr>
+  ${list.map(t => `<tr><td>${esc(t.productName)}</td><td class="r num">${t.quantitySold}</td><td class="r num">${money(t.totalSales)}</td></tr>`).join('')}</table>`
+  : '<div class="empty">ຍັງບໍ່ມີການຂາຍໃນຊ່ວງນີ້</div>';
 
-async function refreshBase() {
-  await run(async () => {
-    const data = await api('getBaseData');
-    S.products = data.products || [];
-    S.customers = data.customers || [];
-    S.units = data.units || [];
-    S.settings = data.settings || {};
-  });
-}
-
-function cartTotal() {
-  return cart.items.reduce((s, i) => s + (Number(i.UnitPrice) * Number(i.Quantity)), 0);
-}
-
-function updateOtCount() {
-  api('getOpenTickets').then(list => {
-    const el = $('#otCount');
-    if (el) el.textContent = list && list.length ? `(${list.length})` : '';
-  }).catch(() => {});
-}
-
-/* ======================= POS ACTIONS ======================= */
-function renderTicket() {
-  const total = cartTotal();
-  const elItems = $('#tItems');
-  if (!elItems) return;
-
-  elItems.innerHTML = cart.items.length ? cart.items.map((item, idx) => `
-    <tr style="border-bottom:1px solid #EEE">
-      <td>
-        <div style="font-weight:600">${esc(item.ProductName)}</div>
-        <div style="font-size:11px;color:var(--muted)">${money(item.UnitPrice)} / ${esc(item.Unit || '')}</div>
-      </td>
-      <td class="r">
-        <input type="number" step="any" value="${item.Quantity}" style="width:60px;text-align:right;padding:4px" 
-               onchange="updCartQty(${idx}, this.value)">
-      </td>
-      <td class="r num" style="font-weight:600">${money(Number(item.UnitPrice) * Number(item.Quantity))}</td>
-      <td class="r"><button class="btn sm danger" onclick="removeCartItem(${idx})">✕</button></td>
-    </tr>
-  `).join('') : '<tr><td colspan="4" class="empty">ຍັງບໍ່ມີລາຍການສິນຄ້າ</td></tr>';
-
-  $('#tTotal').textContent = money(total);
-
-  const custOpts = S.customers.map(c => `
-    <option value="${esc(c.CustomerID)}" ${String(c.CustomerID) === String(cart.customerId) ? 'selected' : ''}>
-      ${esc(c.CustomerName)}
-    </option>
-  `).join('');
-
-  $('#tCustBox').innerHTML = `
-    <div class="row" style="margin-top:8px">
-      <select id="tCust" class="inp" style="font-size:12px;padding:4px">
-        <option value="">-- ລູກຄ້າທົ່ວໄປ --</option>
-        ${custOpts}
-      </select>
+async function loadDash(){
+  const [d, m] = await Promise.all([api('getDashboardData'), api('getStockMovementDashboard')]);
+  const card = (lbl, x) => `<div class="panel stat"><div class="lbl">${lbl}</div><div class="val num">${money(x.totalSales)}</div>
+    <div class="sub num">ກຳໄລ ${money(x.totalProfit)} · ຂາຍ ${x.totalQty} ຊິ້ນ · ${x.transactionCount} ລາຍການ</div></div>`;
+  const mv = (lbl, x) => `<tr><td>${lbl}</td><td class="r num">+${x.totalIn} (${x.inCount})</td><td class="r num">−${x.totalOut} (${x.outCount})</td></tr>`;
+  $('#dashBody').innerHTML = `
+    <div class="grid g3">${card('ຍອດຂາຍມື້ນີ້', d.daily)}${card('ອາທິດນີ້', d.weekly)}${card('ເດືອນນີ້', d.monthly)}
+      <div class="panel stat ${d.unpaidCount ? 'warn' : ''}" style="cursor:pointer" onclick="$('#invFilter').value='Unpaid';go('invoices')">
+        <div class="lbl">ໃບບິນຍັງບໍ່ຈ່າຍ</div><div class="val num">${money(d.unpaidTotal)}</div><div class="sub">${d.unpaidCount} ໃບ · ແຕະເພື່ອເບິ່ງ</div></div>
     </div>
-    <div class="row" style="margin-top:8px">
-      <label class="f" style="flex:1">ວິທີຊຳລະ
-        <select id="tPay" class="inp" style="padding:4px;font-size:12px" onchange="cart.pay = this.value; renderTicket();">
-          <option value="Cash" ${cart.pay === 'Cash' ? 'selected' : ''}>ເງິນສົດ</option>
-          <option value="Transfer" ${cart.pay === 'Transfer' ? 'selected' : ''}>ໂອນເງິນ (BCEL One)</option>
-          <option value="Credit" ${cart.pay === 'Credit' ? 'selected' : ''}>ຕິດໜີ້ (ບິນເຊັກ)</option>
-        </select>
-      </label>
-      ${cart.pay === 'Cash' ? `
-        <label class="f" style="flex:1">ຮັບເງິນມາ
-          <input type="number" step="any" id="tRec" value="${cart.received || ''}" placeholder="0" 
-                 style="padding:4px;font-size:12px" oninput="cart.received = this.value; updChange();">
-        </label>
-      ` : ''}
-    </div>
-    <div id="tChange" class="r num" style="margin-top:4px;font-weight:bold;font-size:13px"></div>
-    <div class="row mt">
-      <input id="tNote" placeholder="ຊື່ບິນ ຫຼື ໝາຍເຫດ..." value="${esc(cart.ticketName || '')}" 
-             oninput="cart.ticketName = this.value" style="margin:0;font-size:12px;padding:6px">
-    </div>
-    <div class="row" style="margin-top:12px">
-      <button class="btn" style="flex:1" onclick="holdTicket()">ພັກບິນ</button>
-      <button class="btn pri" style="flex:2;font-size:16px;padding:10px" onclick="checkout()">ຊຳລະເງິນ / ພິມບິນ</button>
-    </div>
-  `;
-
-  $('#tCust').onchange = e => {
-    const c = S.customers.find(x => String(x.CustomerID) === String(e.target.value));
-    if (c) {
-      cart.customerId = c.CustomerID;
-      cart.customerName = c.CustomerName || '';
-      cart.phone = c.Phone || '';
-    } else {
-      cart.customerId = '';
-      cart.customerName = 'ລູກຄ້າທົ່ວໄປ';
-      cart.phone = '';
-    }
-    renderTicket();
+    <div class="grid g2 mt">
+      <div class="panel"><div class="row"><h2 style="margin:0">ສິນຄ້າຂາຍດີ</h2><span class="spacer"></span>
+        <select class="inp inline" id="topPeriod"><option value="daily">ມື້ນີ້</option><option value="weekly">ອາທິດນີ້</option>
+          <option value="monthly" selected>ເດືອນນີ້</option><option value="all">ທັງໝົດ</option></select></div>
+        <div id="topBox" class="mt">${topTable(d.topProducts)}</div></div>
+      <div class="panel"><h2>ສິນຄ້າໃກ້ໝົດ</h2>${d.lowStock.length ? `<table><tr><th>ສິນຄ້າ</th><th class="r">ຄົງເຫຼືອ</th><th class="r">ຂັ້ນຕ່ຳ</th><th></th></tr>
+        ${d.lowStock.map(p => `<tr><td>${esc(p.ProductName)}</td><td class="r num" style="color:var(--red);font-weight:600">${p.CurrentStock}</td>
+          <td class="r num">${p.MinStock}</td><td class="r"><button class="btn sm" onclick="stockForm(null,'${esc(p.ProductID)}')">+ ເຂົ້າ</button></td></tr>`).join('')}</table>`
+        : '<div class="empty">ສະຕັອກພຽງພໍທຸກລາຍການ</div>'}</div>
+      <div class="panel"><h2>ການເຄື່ອນໄຫວສະຕັອກ</h2><table><tr><th></th><th class="r">ເຂົ້າ (ຄັ້ງ)</th><th class="r">ອອກ (ຄັ້ງ)</th></tr>
+        ${mv('ມື້ນີ້', m.daily)}${mv('ອາທິດນີ້', m.weekly)}${mv('ເດືອນນີ້', m.monthly)}</table></div>
+    </div>`;
+  $('#topPeriod').onchange = async e => {
+    $('#topBox').innerHTML = '<div class="empty">ກຳລັງໂຫຼດ...</div>';
+    const t = await run(() => api('getTopSellingProducts', e.target.value, 10));
+    $('#topBox').innerHTML = topTable(t || []);
   };
+}
+
+/* ======================= POS ======================= */
+let cart = newCart();
+function newCart(){ return { ticketId:'', ticketName:'', customerId:'', customerName:'', phone:'', items:[],
+  pay:'Cash', status:'Paid', note:'', cash:'', transfer:'', received:'', date:'', signature:'' }; }
+const opt = (v, l, cur) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${l}</option>`;
+
+async function loadPos(){
+  const [st] = await Promise.all([api('getSettings').catch(() => ({})), refreshBase()]);
+  S.settings = st;
+  renderPosGrid(); renderTicket(); updateOtCount();
+}
+async function updateOtCount(){ try{ const t = await api('getOpenTickets'); $('#otCount').textContent = t.length ? `(${t.length})` : ''; }catch(e){} }
+function posList(){
+  const q = $('#posSearch').value.trim().toLowerCase();
+  return S.products.filter(p => !q || String(p.ProductName).toLowerCase().includes(q) || String(p.SKU).toLowerCase().includes(q));
+}
+$('#posSearch').oninput = renderPosGrid;
+// ກົດ Enter (ຫຼື ສະແກນບາໂຄດ) → ເພີ່ມສິນຄ້າທີ່ SKU ກົງກັນ
+$('#posSearch').onkeydown = e => {
+  if(e.key !== 'Enter') return;
+  const q = e.target.value.trim().toLowerCase(); if(!q) return;
+  const list = posList();
+  const p = S.products.find(x => String(x.SKU).toLowerCase() === q) || (list.length === 1 ? list[0] : null);
+  if(p){ addToCart(p.ProductID); e.target.value = ''; renderPosGrid(); }
+  else toast(list.length ? 'ພົບຫຼາຍລາຍການ — ແຕະເລືອກສິນຄ້າ' : 'ບໍ່ພົບສິນຄ້ານີ້', true);
+};
+function renderPosGrid(){
+  const list = posList();
+  $('#posGrid').innerHTML = list.length ? list.map(p => `
+    <button class="pcard ${Number(p.CurrentStock) <= Number(p.MinStock) ? 'low' : ''}" onclick="addToCart('${esc(p.ProductID)}')">
+      ${p.ImageURL ? `<img src="${esc(p.ImageURL)}" alt="" loading="lazy">` : '<div class="noimg">📦</div>'}
+      <div class="nm">${esc(p.ProductName)}</div>
+      <div class="pr num">${money(p.SellingPrice)}</div>
+      <div class="st num">ເຫຼືອ ${p.CurrentStock} ${esc(p.Unit || '')}</div>
+    </button>`).join('') : '<div class="empty">ບໍ່ພົບສິນຄ້າ</div>';
+}
+const stockOf = id => { const p = S.products.find(x => String(x.ProductID) === String(id)); return p ? Number(p.CurrentStock) || 0 : Infinity; };
+function addToCart(id){
+  const p = S.products.find(x => String(x.ProductID) === String(id)); if(!p) return;
+  const it = cart.items.find(x => x.productId === p.ProductID);
+  const next = (it ? Number(it.quantity) : 0) + 1;
+  if(next > stockOf(p.ProductID)) return toast(`"${p.ProductName}" ເຫຼືອພຽງ ${p.CurrentStock}`, true);
+  if(it) it.quantity = next;
+  else cart.items.push({ productId:p.ProductID, productName:p.ProductName, quantity:1, unitPrice:Number(p.SellingPrice)||0, unit:p.Unit||'' });
+  renderTicket();
+}
+function setQty(k, v){
+  const it = cart.items[k]; it.quantity = v;
+  if(Number(v) > stockOf(it.productId)) toast(`"${it.productName}" ເຫຼືອພຽງ ${stockOf(it.productId)} — ກະລຸນາຫຼຸດຈຳນວນ`, true);
+  renderTicket();
+}
+function setPay(v){
+  cart.pay = v;
+  if(v === 'Split' && cart.cash === '' && cart.transfer === ''){ cart.cash = cartTotal(); cart.transfer = 0; }
+  renderTicket();
+}
+function cartTotal(){ return cart.items.reduce((s,i) => s + (Number(i.quantity)||0)*(Number(i.unitPrice)||0), 0); }
+function renderTicket(){
+  const total = cartTotal();
+  const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === cart.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
+  $('#ticket').innerHTML = `
+    <div class="head">
+      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(cart.ticketName || '') : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
+        <button class="btn sm" onclick="clearCart()">ລ້າງ</button></div>
+      <select class="inp" id="tCust" style="margin-top:10px"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select>
+      <div class="row" style="margin-top:8px">
+        <input class="inp" placeholder="ຊື່ລູກຄ້າ" value="${esc(cart.customerName)}" oninput="cart.customerName=this.value" style="flex:1;margin:0">
+        <input class="inp" placeholder="ເບີໂທ" value="${esc(cart.phone)}" oninput="cart.phone=this.value" style="flex:1;margin:0">
+      </div>
+    </div>
+    <div class="lines">${cart.items.length ? cart.items.map((i, k) => `
+      <div class="line">
+        <div><div style="font-weight:600;font-size:14px">${esc(i.productName)}</div><div style="font-size:12px;color:var(--muted)">${esc(i.unit)} · ${money((Number(i.quantity)||0)*(Number(i.unitPrice)||0))}</div></div>
+        <input type="number" min="0" step="${unitIsWeight(i.unit) ? '0.01' : '1'}" value="${esc(i.quantity)}" onchange="setQty(${k},this.value)" aria-label="ຈຳນວນ">
+        <input type="number" min="0" value="${esc(i.unitPrice)}" onchange="cart.items[${k}].unitPrice=this.value;renderTicket()" aria-label="ລາຄາ">
+        <button class="x" onclick="cart.items.splice(${k},1);renderTicket()" aria-label="ລົບ">×</button>
+      </div>`).join('') : '<div class="empty">ແຕະສິນຄ້າ ຫຼື ສະແກນ SKU ເພື່ອເພີ່ມເຂົ້າບິນ</div>'}</div>
+    <div class="total"><span>ລວມ</span><span class="num">${money(total)}</span></div>
+    <div class="row">
+      <select class="inp" style="flex:1;margin:0" onchange="setPay(this.value)" aria-label="ວິທີຊຳລະ">
+        ${opt('Cash','ເງິນສົດ',cart.pay)}${opt('Transfer','ເງິນໂອນ',cart.pay)}${opt('Split','ສົດ + ໂອນ',cart.pay)}</select>
+      <select class="inp" style="flex:1;margin:0" onchange="cart.status=this.value" aria-label="ສະຖານະ">
+        ${opt('Paid','ຈ່າຍແລ້ວ',cart.status)}${opt('Unpaid','ຕິດໜີ້',cart.status)}</select>
+    </div>
+    ${cart.pay === 'Cash' ? `<div class="row" style="margin-top:8px">
+      <input class="inp num" type="number" placeholder="ຮັບເງິນມາ" value="${esc(cart.received)}" oninput="cart.received=this.value;updChange()" style="flex:1;margin:0">
+      <span id="tChange" class="num" style="flex:1;text-align:right"></span></div>` : ''}
+    ${cart.pay === 'Split' ? `<div class="row" style="margin-top:8px">
+      <label style="flex:1;font-size:12px;color:var(--muted)">ສົດ<input class="inp num" type="number" value="${esc(cart.cash)}" oninput="cart.cash=this.value;cart.transfer=Math.max(0,cartTotal()-(Number(this.value)||0));$('#tTr').value=cart.transfer" style="margin:0"></label>
+      <label style="flex:1;font-size:12px;color:var(--muted)">ໂອນ<input id="tTr" class="inp num" type="number" value="${esc(cart.transfer)}" oninput="cart.transfer=this.value" style="margin:0"></label></div>` : ''}
+    ${cart.pay !== 'Cash' && S.settings.QRCodeURL ? `<div style="text-align:center;margin-top:8px"><img src="${esc(S.settings.QRCodeURL)}" style="width:130px" alt="QR ຮັບເງິນໂອນ"></div>` : ''}
+    <div class="row" style="margin-top:8px">
+      <input class="inp" type="datetime-local" value="${esc(cart.date)}" onchange="cart.date=this.value" title="ວັນທີຂາຍ (ປ່ອຍຫວ່າງ = ຕອນນີ້)" style="flex:1;margin:0">
+      <button class="btn" onclick="signPad()">${cart.signature ? '✓ ເຊັນແລ້ວ' : 'ເຊັນຊື່'}</button>
+    </div>
+    <input class="inp" placeholder="ໝາຍເຫດ" value="${esc(cart.note)}" oninput="cart.note=this.value" style="margin-top:8px">
+    <div class="row" style="margin-top:12px">
+      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>ພັກບິນ</button>
+      <button class="btn pri" style="flex:2" id="btnCheckout" onclick="checkout()" ${cart.items.length ? '' : 'disabled'}>ຮັບເງິນ ${money(total)}</button>
+    </div>`;
+  $('#tCust').onchange = e => { const c = S.customers.find(x => x.CustomerID === e.target.value);
+    cart.customerId = e.target.value; cart.customerName = c ? c.CustomerName : ''; cart.phone = c ? String(c.Phone||'') : ''; renderTicket(); };
   updChange();
 }
+function updChange(){
+  const el = $('#tChange'); if(!el) return;
+  const r = Number(cart.received) || 0; if(!r){ el.textContent = ''; return; }
+  const c = r - cartTotal();
+  el.innerHTML = c >= 0 ? `ທອນ <b>${money(c)}</b>` : `<span style="color:var(--red)">ຂາດ ${money(-c)}</span>`;
+}
+function clearCart(){ cart = newCart(); renderTicket(); }
 
-function updCartQty(idx, val) {
-  const q = Number(val);
-  if (q <= 0) {
-    cart.items.splice(idx, 1);
-  } else {
-    cart.items[idx].Quantity = q;
-  }
-  renderTicket();
+// ລາຍເຊັນລູກຄ້າ (ເກັບໃນຖັນ Signature ຂອງໃບບິນ)
+function signPad(){
+  openModal('ລາຍເຊັນລູກຄ້າ', `<canvas id="sig" width="600" height="220" style="width:100%;border:1px dashed var(--line);border-radius:8px;touch-action:none;background:#fff"></canvas>
+    <div class="row mt"><button class="btn" id="sigClear">ລ້າງ</button><span class="spacer"></span><button class="btn pri" id="sigOk">ໃຊ້ລາຍເຊັນນີ້</button></div>`);
+  const c = $('#sig'), x = c.getContext('2d'); let drawing = false, used = false;
+  x.lineWidth = 3; x.lineCap = 'round'; x.lineJoin = 'round'; x.strokeStyle = '#1B2A24';
+  const pos = e => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  if(cart.signature){ const im = new Image(); im.onload = () => x.drawImage(im, 0, 0, c.width, c.height); im.src = cart.signature; used = true; }
+  c.onpointerdown = e => { drawing = true; used = true; c.setPointerCapture(e.pointerId); x.beginPath(); x.moveTo(...pos(e)); };
+  c.onpointermove = e => { if(!drawing) return; x.lineTo(...pos(e)); x.stroke(); };
+  c.onpointerup = c.onpointercancel = () => drawing = false;
+  $('#sigClear').onclick = () => { x.clearRect(0, 0, c.width, c.height); used = false; };
+  $('#sigOk').onclick = () => {
+    if(used){ const s = document.createElement('canvas'); s.width = 300; s.height = 110; const sx = s.getContext('2d');
+      sx.fillStyle = '#fff'; sx.fillRect(0, 0, 300, 110); sx.drawImage(c, 0, 0, 300, 110); cart.signature = s.toDataURL('image/jpeg', .7); }
+    else cart.signature = '';
+    closeModal(); renderTicket();
+  };
 }
 
-function removeCartItem(idx) {
-  cart.items.splice(idx, 1);
-  renderTicket();
+async function holdTicket(){
+  const name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', cart.ticketName || cart.customerName || '');
+  if(name === null) return;
+  cart.ticketName = name;
+  const r = await run(() => api('saveOpenTicket', { ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
+    customerName:cart.customerName, phone:cart.phone, items:cart.items }), 'ພັກບິນແລ້ວ');
+  if(r){ clearCart(); updateOtCount(); }
 }
 
-function updChange() {
-  const total = cartTotal();
-  const rec = Number(cart.received) || 0;
-  const el = $('#tChange');
-  if (el) {
-    if (cart.pay === 'Cash' && rec > 0) {
-      const chg = rec - total;
-      el.textContent = chg >= 0 ? `ເງິນທອນ: ${money(chg)}` : `ຂາດອີກ: ${money(-chg)}`;
-      el.style.color = chg >= 0 ? 'var(--jade)' : 'var(--red)';
-    } else {
-      el.textContent = '';
-    }
-  }
-}
+/* ---------- ບິນຄ້າງ: ລາຍການ / ເບິ່ງ / ແກ້ໄຂ / ເປີດຂາຍ / ລົບ ---------- */
+let TK = null;
+const tkTotal = () => TK.items.reduce((s,i) => s + N(i.quantity) * N(i.unitPrice), 0);
 
-function clearCart() {
-  cart = newCart();
-  renderTicket();
+async function showOpenTickets(){
+  openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+  const list = await run(() => api('getOpenTickets')); if(!list) return;
+  $('#mBody').innerHTML = list.length ? `<div class="tbl-wrap"><table><tr><th>ຊື່ບິນ</th><th>ເວລາ</th><th class="r">ຍອດ</th><th></th></tr>
+    ${list.map(t => `<tr class="click" onclick="viewTicket('${esc(t.TicketID)}')">
+      <td><b>${esc(t.TicketName || '-')}</b><br><small>${esc(t.CustomerName || '')} · ${t.ItemCount} ລາຍການ</small></td>
+      <td>${fmtDate(t.CreatedAt)}</td><td class="r num">${money(t.TotalAmount)}</td>
+      <td class="r" style="white-space:nowrap">
+        <button class="btn sm" onclick="event.stopPropagation();viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
+        <button class="btn sm" onclick="event.stopPropagation();viewTicket('${esc(t.TicketID)}',true)">ແກ້ໄຂ</button>
+        <button class="btn sm pri" onclick="event.stopPropagation();loadTicket('${esc(t.TicketID)}')">ເປີດຂາຍ</button>
+        <button class="btn sm danger" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`
+    : '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>';
 }
-
-async function holdTicket() {
-  if (!cart.items.length) return toast('ບໍ່ມີລາຍການສິນຄ້າໃນບິນ', true);
-  await run(async () => {
-    await api('saveOpenTicket', cart);
-    toast('ບັນທຶກພັກບິນຮຽບຮ້ອຍແລ້ວ');
-    clearCart();
-    updateOtCount();
-  });
+async function viewTicket(id, edit){
+  openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+  const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
+  if(!S.products.length || !S.customers.length) await refreshBase();
+  const t = r.ticket;
+  TK = { ticketId:t.TicketID, ticketName:t.TicketName || '', customerId:t.CustomerID || '', customerName:t.CustomerName || '',
+    phone:String(t.Phone || ''), createdAt:t.CreatedAt, items:(r.items || []).map(i => ({ ...i })) };
+  edit ? tkEdit() : tkView();
 }
-
-async function showOpenTickets() {
-  const list = await run(() => api('getOpenTickets'));
-  if (!list) return;
-  if (!list.length) return toast('ບໍ່ມີລາຍການບິນຄ້າງ');
-  const html = `
-    <div style="max-height:60vh;overflow:auto">
-      <table>
-        <tr><th>ຊື່ບິນ / ລູກຄ້າ</th><th>ເວລາ</th><th class="r">ຍອດລວມ</th><th>ຈັດການ</th></tr>
-        ${list.map(t => `
-          <tr>
-            <td><strong>${esc(t.ticketName || t.customerName || 'ບິນບໍ່ມີຊື່')}</strong></td>
-            <td>${fmtDate(t.updatedAt || t.createdAt)}</td>
-            <td class="r num">${money(t.total || 0)}</td>
-            <td class="r">
-              <button class="btn sm pri" onclick="loadOpenTicket('${esc(t.ticketId)}')">ໂຫຼດບິນ</button>
-              <button class="btn sm danger" onclick="deleteOpenTicket('${esc(t.ticketId)}')">ລົບ</button>
-            </td>
-          </tr>
-        `).join('')}
-      </table>
+function tkView(){
+  $('#mTitle').textContent = 'ບິນຄ້າງ: ' + (TK.ticketName || '-');
+  $('#mBody').innerHTML = `
+    <div style="margin-bottom:10px;font-size:14px">
+      <div><span style="color:var(--muted)">ລູກຄ້າ:</span> <b>${esc(TK.customerName || 'ລູກຄ້າທົ່ວໄປ')}</b> ${TK.phone ? '· ' + esc(TK.phone) : ''}</div>
+      <div><span style="color:var(--muted)">ເວລາພັກບິນ:</span> ${fmtDate(TK.createdAt)}</div>
     </div>
-  `;
-  openModal('ລາຍການບິນຄ້າງ (ພັກບິນ)', html);
+    <div class="tbl-wrap">${TK.items.length ? `<table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
+      ${TK.items.map(i => `<tr><td>${esc(i.productName)}</td><td class="r num">${esc(i.quantity)} ${esc(i.unit || '')}</td>
+        <td class="r num">${money(i.unitPrice)}</td><td class="r num">${money(N(i.quantity) * N(i.unitPrice))}</td></tr>`).join('')}</table>`
+      : '<div class="empty">ບິນນີ້ບໍ່ມີສິນຄ້າ</div>'}</div>
+    <div class="num" style="text-align:right;font-size:20px;font-weight:700;margin:10px 0">ລວມ ${money(tkTotal())}</div>
+    <div class="row"><button class="btn" onclick="showOpenTickets()">← ກັບຄືນ</button><span class="spacer"></span>
+      <button class="btn" onclick="tkEdit()">ແກ້ໄຂ</button>
+      <button class="btn pri" onclick="loadTicket('${esc(TK.ticketId)}')">ເປີດໃນໜ້າຂາຍ</button></div>`;
 }
-
-async function loadOpenTicket(id) {
-  const t = await run(() => api('getOpenTicket', id));
-  if (!t) return;
-  cart = t;
-  closeModal();
-  renderTicket();
+function tkEdit(){
+  $('#mTitle').textContent = 'ແກ້ໄຂບິນຄ້າງ';
+  const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === TK.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
+  const prodOpts = S.products.map(p => `<option value="${esc(p.ProductID)}">${esc(p.ProductName)} (ເຫຼືອ ${esc(p.CurrentStock)})</option>`).join('');
+  $('#mBody').innerHTML = `
+    <label class="f">ຊື່ບິນ<input id="tkName" value="${esc(TK.ticketName)}"></label>
+    <label class="f">ລູກຄ້າ<select id="tkCust"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select></label>
+    <div class="grid g2" style="gap:0 14px">
+      <label class="f">ຊື່ລູກຄ້າ<input id="tkCName" value="${esc(TK.customerName)}"></label>
+      <label class="f">ເບີໂທ<input id="tkPhone" value="${esc(TK.phone)}"></label>
+    </div>
+    <div id="tkItems"></div>
+    <div class="row" style="margin-top:8px">
+      <select class="inp" id="tkAddSel" style="flex:1;margin:0"><option value="">+ ເພີ່ມສິນຄ້າ...</option>${prodOpts}</select>
+    </div>
+    <div id="tkTotal" class="num" style="text-align:right;font-size:20px;font-weight:700;margin:12px 0"></div>
+    <div class="row"><button class="btn" onclick="tkView()">ຍົກເລີກ</button><span class="spacer"></span>
+      <button class="btn pri" id="tkSave">ບັນທຶກ</button></div>`;
+  $('#tkName').oninput = e => TK.ticketName = e.target.value;
+  $('#tkCName').oninput = e => TK.customerName = e.target.value;
+  $('#tkPhone').oninput = e => TK.phone = e.target.value;
+  $('#tkCust').onchange = e => {
+    const c = S.customers.find(x => x.CustomerID === e.target.value);
+    TK.customerId = e.target.value; TK.customerName = c ? c.CustomerName : ''; TK.phone = c ? String(c.Phone || '') : '';
+    $('#tkCName').value = TK.customerName; $('#tkPhone').value = TK.phone;
+  };
+  $('#tkAddSel').onchange = e => {
+    const p = S.products.find(x => String(x.ProductID) === e.target.value); if(!p) return;
+    const it = TK.items.find(x => String(x.productId) === String(p.ProductID));
+    if(it) it.quantity = N(it.quantity) + 1;
+    else TK.items.push({ productId:p.ProductID, productName:p.ProductName, quantity:1, unitPrice:N(p.SellingPrice), unit:p.Unit || '' });
+    e.target.value = ''; tkDrawItems();
+  };
+  $('#tkSave').onclick = tkSave;
+  tkDrawItems();
 }
-
-async function deleteOpenTicket(id) {
-  if (!confirm('ທ່ານຕ້ອງການລົບບິນຄ້າງນີ້ ຫຼື ບໍ່?')) return;
-  await run(async () => {
-    await api('deleteOpenTicket', id);
-    toast('ລົບບິນຄ້າງຮຽບຮ້ອຍແລ້ວ');
-    showOpenTickets();
-    updateOtCount();
-  });
+function tkDrawTotal(){ const el = $('#tkTotal'); if(el) el.textContent = 'ລວມ ' + money(tkTotal()); }
+function tkDrawItems(){
+  $('#tkItems').innerHTML = TK.items.length ? `<div class="tbl-wrap"><table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th></th></tr>
+    ${TK.items.map((i,k) => `<tr><td>${esc(i.productName)}<br><small style="color:var(--muted)">${esc(i.unit || '')}</small></td>
+      <td class="r"><input class="inp inline num" type="number" min="0" step="${unitIsWeight(i.unit) ? '0.01' : '1'}" value="${esc(i.quantity)}" style="width:80px" oninput="TKset(${k},'quantity',this.value)"></td>
+      <td class="r"><input class="inp inline num" type="number" min="0" value="${esc(i.unitPrice)}" style="width:110px" oninput="TKset(${k},'unitPrice',this.value)"></td>
+      <td class="r"><button class="btn sm danger" onclick="TKdel(${k})" aria-label="ລົບ">×</button></td></tr>`).join('')}</table></div>`
+    : '<div class="empty">ຍັງບໍ່ມີສິນຄ້າ — ເລືອກສິນຄ້າດ້ານລຸ່ມ</div>';
+  tkDrawTotal();
 }
+function TKset(k, f, v){ TK.items[k][f] = v; tkDrawTotal(); }
+function TKdel(k){ TK.items.splice(k, 1); tkDrawItems(); }
+async function tkSave(){
+  const items = TK.items.filter(i => N(i.quantity) > 0).map(i => ({ ...i, quantity:N(i.quantity), unitPrice:N(i.unitPrice) }));
+  if(!items.length) return toast('ບິນຕ້ອງມີສິນຄ້າຢ່າງໜ້ອຍ 1 ລາຍການ (ຈຳນວນ > 0)', true);
+  $('#tkSave').disabled = true;
+  const r = await run(() => api('saveOpenTicket', { ticketId:TK.ticketId, ticketName:TK.ticketName, customerId:TK.customerId,
+    customerName:TK.customerName, phone:TK.phone, items }), 'ບັນທຶກບິນຄ້າງແລ້ວ');
+  if(!r){ $('#tkSave').disabled = false; return; }
+  // ຖ້າບິນນີ້ເປີດຢູ່ໃນໜ້າຂາຍ ໃຫ້ຊິ້ງຂໍ້ມູນນຳ
+  if(cart.ticketId === TK.ticketId){
+    Object.assign(cart, { ticketName:TK.ticketName, customerId:TK.customerId, customerName:TK.customerName, phone:TK.phone, items });
+    if(CUR === 'pos') renderTicket();
+  }
+  updateOtCount();
+  viewTicket(TK.ticketId);
+}
+async function loadTicket(id){
+  if(cart.items.length && !cart.ticketId && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
+  const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
+  cart = { ...newCart(), ticketId:r.ticket.TicketID, ticketName:r.ticket.TicketName||'', customerId:r.ticket.CustomerID||'',
+    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[] };
+  closeModal(); if(CUR !== 'pos') go('pos'); else renderTicket();
+}
+async function delTicket(id){ if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
+  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){ showOpenTickets(); updateOtCount(); } }
 
-async function checkout() {
-  if (!cart.items.length) return toast('ກະລຸນາເລືອກສິນຄ້າຢ່າງນ້ອຍ 1 ລາຍການ', true);
-  
+async function checkout(){
   const total = cartTotal();
-  if (cart.pay === 'Cash' && cart.received && Number(cart.received) < total) {
-    if (!confirm('ຈຳນວນເງິນທີ່ຮັບມານ້ອຍກວ່າຍອດລວມ ຕ້ອງການດຳເນີນການຕໍ່ ຫຼື ບໍ່?')) return;
+  for(const i of cart.items){
+    if(!(Number(i.quantity) > 0)) return toast(`ຈຳນວນຂອງ "${i.productName}" ບໍ່ຖືກຕ້ອງ`, true);
+    if(Number(i.quantity) > stockOf(i.productId)) return toast(`"${i.productName}" ເຫຼືອພຽງ ${stockOf(i.productId)}`, true);
   }
-
-  const res = await run(() => api('createInvoice', cart), 'ເຮັດລາຍການສຳເລັດແລ້ວ');
-  if (res) {
-    if (cart.ticketId) {
-      await api('deleteOpenTicket', cart.ticketId).catch(() => {});
-    }
-    clearCart();
-    if (res.invoiceId) {
-      printReceipt(res.invoiceId);
-    }
-  }
-}
-
-async function printReceipt(invId) {
-  const inv = await run(() => api('getInvoiceDetail', invId));
-  if (!inv) return;
-  
-  const shop = S.settings || {};
-  const items = inv.items || [];
-  
-  const win = window.open('', '_blank', 'width=400,height=600');
-  win.document.write(`
-    <!DOCTYPE html>
-    <html lang="lo">
-    <head>
-      <meta charset="UTF-8">
-      <title>ໃບເສັດຮັບເງິນ ${esc(inv.InvoiceNumber || invId)}</title>
-      <style>
-        body { font-family: 'Phetsarath OT', sans-serif; font-size: 12px; margin: 0; padding: 10px; width: 280px; }
-        .tc { text-align: center; }
-        .r { text-align: right; }
-        .line { border-bottom: 1px dashed #000; margin: 5px 0; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        td, th { padding: 2px 0; vertical-align: top; }
-      </style>
-    </head>
-    <body onload="window.print();">
-      <div class="tc">
-        <h3 style="margin:0">${esc(shop.ShopName || 'ຮ້ານຄ້າ')}</h3>
-        <div>${esc(shop.Address || '')}</div>
-        <div>${esc(shop.Phone ? 'ໂທ: ' + shop.Phone : '')}</div>
-        ${shop.HeaderMsg ? `<div>${esc(shop.HeaderMsg)}</div>` : ''}
-      </div>
-      <div class="line"></div>
-      <div>ເລກທີ: ${esc(inv.InvoiceNumber || invId)}</div>
-      <div>ວັນທີ: ${fmtDate(inv.CreatedAt || inv.Date)}</div>
-      <div>ລູກຄ້າ: ${esc(inv.CustomerName || 'ລູກຄ້າທົ່ວໄປ')} ${inv.Phone ? '(' + esc(inv.Phone) + ')' : ''}</div>
-      <div class="line"></div>
-      <table>
-        ${items.map(i => `
-          <tr>
-            <td colspan="3">${esc(i.ProductName)}</td>
-          </tr>
-          <tr>
-            <td>${i.Quantity} ${esc(i.Unit \vert{}\vert{} '')} x${N(i.UnitPrice).toLocaleString()}</td>
-            <td class="r" colspan="2">${money(Number(i.Quantity) * Number(i.UnitPrice))}</td>
-          </tr>
-        `).join('')}
-      </table>
-      <div class="line"></div>
-      <table>
-        <tr><th>ຍອດລວມທັງໝົດ</th><th class="r">${money(inv.TotalAmount)}</th></tr>
-        ${inv.PaymentMethod === 'Cash' && inv.ReceivedAmount ? `
-          <tr><td>ຮັບເງິນສົດ</td><td class="r">${money(inv.ReceivedAmount)}</td></tr>
-          <tr><td>ເງິນທອນ</td><td class="r">${money(Number(inv.ReceivedAmount) - Number(inv.TotalAmount))}</td></tr>
-        ` : ''}
-        <tr><td>ຊຳລະໂດຍ</td><td class="r">${esc(inv.PaymentMethod)}</td></tr>
-        <tr><td>ສະຖານະ</td><td class="r">${inv.PaymentStatus === 'Paid' ? 'ຊຳລະແລ້ວ' : 'ຕິດໜີ້'}</td></tr>
-      </table>
-      <div class="line"></div>
-      <div class="tc">
-        <div>${esc(shop.FooterMsg || 'ຂອບໃຈທີ່ອຸດໜູນ')}</div>
-      </div>
-    </body>
-    </html>
-  `);
-  win.document.close();
+  let cash = 0, transfer = 0;
+  if(cart.pay === 'Split'){ cash = Number(cart.cash)||0; transfer = Number(cart.transfer)||0;
+    if(Math.abs(cash + transfer - total) > 0.001) return toast('ຍອດສົດ + ໂອນ ຕ້ອງເທົ່າກັບ ' + money(total), true); }
+  if(cart.status === 'Unpaid' && !String(cart.customerName).trim() && !confirm('ບິນຕິດໜີ້ແຕ່ບໍ່ມີຊື່ລູກຄ້າ. ບັນທຶກຕໍ່ບໍ?')) return;
+  $('#btnCheckout').disabled = true;
+  const sale = { customerId:cart.customerId, customerName:cart.customerName, phone:cart.phone,
+    paymentMethod: cart.pay === 'Split' ? 'Cash+Transfer' : cart.pay, paymentStatus:cart.status, note:cart.note, signature:cart.signature,
+    items: cart.items.map(i => ({ productId:i.productId, quantity:Number(i.quantity), unitPrice:Number(i.unitPrice) })) };
+  if(cart.date) sale.date = cart.date;
+  const r = await run(() => api('recordSale', sale));
+  if(!r){ $('#btnCheckout').disabled = false; return; }
+  if(cart.pay === 'Split') await run(() => api('setInvoiceSplitAmounts', r.invoiceNo, 'Cash+Transfer', cash, transfer));
+  if(cart.ticketId) await run(() => api('deleteOpenTicket', cart.ticketId));
+  const change = cart.pay === 'Cash' && Number(cart.received) > total ? Number(cart.received) - total : 0;
+  toast(change ? 'ຂາຍສຳເລັດ — ທອນ ' + money(change) : 'ຂາຍສຳເລັດ');
+  clearCart(); loadPos(); showInvoice(r.invoiceNo);
 }
 
 /* ======================= PRODUCTS ======================= */
-async function loadProducts() {
-  await refreshBase();
-  const cats = [...new Set(S.products.map(p => p.Category).filter(Boolean))];
-  const elFilter = $('#prodFilter');
-  if(elFilter) {
-    elFilter.innerHTML = `<option value="all">ທຸກໝວດໝູ່</option>${cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('')}`;
-  }
-  renderProducts();
+async function loadProducts(){ await refreshBase(); renderProducts(); }
+$('#prodSearch').oninput = renderProducts;
+$('#prodFilter').onchange = renderProducts;
+function filteredProducts(){
+  const q = $('#prodSearch').value.trim().toLowerCase(), f = $('#prodFilter').value || 'all';
+  return S.products.filter(p => (!q || [p.ProductName, p.SKU, p.Category].join(' ').toLowerCase().includes(q)) &&
+    (f === 'all' || (f === 'low' ? Number(p.CurrentStock) <= Number(p.MinStock) : 'c:' + String(p.Category || '').trim() === f)));
 }
-
-function renderProducts() {
-  const elSearch = $('#prodSearch');
-  const elFilter = $('#prodFilter');
-  if(!elSearch || !elFilter) return;
-
-  const q = elSearch.value.trim().toLowerCase();
-  const cat = elFilter.value;
-  
-  const list = S.products.filter(p => {
-    const mQ = !q || String(p.ProductName).toLowerCase().includes(q) || String(p.SKU).toLowerCase().includes(q) || String(p.Category).toLowerCase().includes(q);
-    const mC = cat === 'all' || p.Category === cat;
-    return mQ && mC;
-  });
-
-  const elTable = $('#prodTable');
-  if(elTable) {
-    elTable.innerHTML = list.length ? `
-      <table>
-        <tr>
-          <th>ຮູບ</th><th>SKU</th><th>ຊື່ສິນຄ້າ</th><th>ໝວດໝູ່</th>
-          <th class="r">ລາຄາທຶນ</th><th class="r">ລາຄາຂາຍ</th><th class="r">ຄົງເຫຼືອ</th>
-          <th>ໜ່ວຍ</th><th>ຈັດການ</th>
-        </tr>
-        ${list.map(p => `
-          <tr>
-            <td>${p.ImageURL ? `<img src="${esc(p.ImageURL)}" class="thumb" alt="">` : '<div class="thumb" style="display:grid;place-items:center">📦</div>'}</td>
-            <td><code>${esc(p.SKU || '')}</code></td>
-            <td><strong>${esc(p.ProductName)}</strong></td>
-            <td>${esc(p.Category || '-')}</td>
-            <td class="r num">${money(p.CostPrice)}</td>
-            <td class="r num" style="color:var(--jade);font-weight:600">${money(p.SellingPrice)}</td>
-            <td class="r num ${Number(p.CurrentStock) <= Number(p.MinStock) ? 'style="color:var(--red);font-weight:bold"' : ''}">${p.CurrentStock}</td>
-            <td>${esc(p.Unit || '')}</td>
-            <td>
-              <button class="btn sm" onclick="productForm('${esc(p.ProductID)}')">ແກ້ໄຂ</button>
-              <button class="btn sm danger" onclick="deleteProduct('${esc(p.ProductID)}')">ລົບ</button>
-            </td>
-          </tr>
-        `).join('')}
-      </table>
-    ` : '<div class="empty">ບໍ່ພົບຂໍ້ມູນສິນຄ້າ</div>';
-  }
+function renderProducts(){
+  const sel = $('#prodFilter'), cur = sel.value || 'all';
+  const cats = [...new Set(S.products.map(p => String(p.Category || '').trim()).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="all">ທຸກປະເພດ</option><option value="low">ໃກ້ໝົດ / ໝົດ</option>' + cats.map(c => `<option value="c:${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === cur) ? cur : 'all';
+  const list = filteredProducts();
+  const value = list.reduce((s,p) => s + (Number(p.CostPrice)||0) * (Number(p.CurrentStock)||0), 0);
+  $('#prodTable').innerHTML = list.length ? `<table><tr><th></th><th>ສິນຄ້າ</th><th>ປະເພດ</th><th class="r">ທຶນ</th><th class="r">ຂາຍ</th><th class="r">ກຳໄລ/ໜ່ວຍ</th><th class="r">ຄົງເຫຼືອ</th><th></th></tr>
+    ${list.map(p => `<tr class="click" onclick="productForm('${esc(p.ProductID)}')">
+      <td>${p.ImageURL ? `<img class="thumb" src="${esc(p.ImageURL)}" alt="">` : '<div class="thumb"></div>'}</td>
+      <td><b>${esc(p.ProductName)}</b><br><small style="color:var(--muted)">${esc(p.SKU)}</small></td>
+      <td>${esc(p.Category)}</td><td class="r num">${money(p.CostPrice)}</td><td class="r num">${money(p.SellingPrice)}</td>
+      <td class="r num">${money((Number(p.SellingPrice)||0) - (Number(p.CostPrice)||0))}</td>
+      <td class="r num" style="${Number(p.CurrentStock) <= Number(p.MinStock) ? 'color:var(--red);font-weight:600' : ''}">${p.CurrentStock} ${esc(p.Unit || '')}</td>
+      <td class="r" style="white-space:nowrap"><button class="btn sm" onclick="event.stopPropagation();stockForm(null,'${esc(p.ProductID)}')">+ ສະຕັອກ</button>
+        <button class="btn sm danger" onclick="event.stopPropagation();delProduct('${esc(p.ProductID)}')">ລົບ</button></td></tr>`).join('')}</table>
+    <div style="margin-top:10px;font-size:13px;color:var(--muted)" class="num">${list.length} ລາຍການ · ມູນຄ່າສະຕັອກ (ລາຄາທຶນ) ${money(value)}</div>`
+    : '<div class="empty">ບໍ່ພົບສິນຄ້າ — ກົດ "+ ເພີ່ມສິນຄ້າ" ເພື່ອເພີ່ມ</div>';
 }
-
-function productForm(id) {
+function exportProducts(){
+  downloadCSV('products.csv', [['ProductID','SKU','ຊື່ສິນຄ້າ','ປະເພດ','ລາຄາທຶນ','ລາຄາຂາຍ','ຂັ້ນຕ່ຳ','ຄົງເຫຼືອ','ໜ່ວຍ']]
+    .concat(filteredProducts().map(p => [p.ProductID, p.SKU, p.ProductName, p.Category, p.CostPrice, p.SellingPrice, p.MinStock, p.CurrentStock, p.Unit])));
+}
+function productForm(id){
   const p = S.products.find(x => String(x.ProductID) === String(id)) || {};
-  const unitOpts = S.units.map(u => `<option value="${esc(u.UnitName)}" ${u.UnitName === p.Unit ? 'selected' : ''}>${esc(u.UnitName)}</option>`).join('');
-  
-  const html = `
-    <form onsubmit="saveProduct(event, '${esc(p.ProductID || '')}')">
-      <div class="grid g2">
-        <label class="f">ລະຫັດສິນຄ້າ / SKU <input id="pSKU" value="${esc(p.SKU || '')}" required></label>
-        <label class="f">ຊື່ສິນຄ້າ <input id="pName" value="${esc(p.ProductName || '')}" required></label>
-      </div>
-      <div class="grid g3 mt">
-        <label class="f">ໝວດໝູ່ <input id="pCat" value="${esc(p.Category || '')}"></label>
-        <label class="f">ໜ່ວຍນັບ <select id="pUnit" class="inp">${unitOpts}</select></label>
-        <label class="f">ສະຕັອກຂັ້ນຕ່ຳ <input type="number" id="pMin" value="${esc(p.MinStock || 5)}"></label>
-      </div>
-      <div class="grid g3 mt">
-        <label class="f">ລາຄາທຶນ <input type="number" step="any" id="pCost" value="${esc(p.CostPrice || 0)}" required></label>
-        <label class="f">ລາຄາຂາຍ <input type="number" step="any" id="pSell" value="${esc(p.SellingPrice || 0)}" required></label>
-        <label class="f">ຈຳນວນສະຕັອກເລີ່ມຕົ້ນ <input type="number" step="any" id="pStock" value="${esc(p.CurrentStock || 0)}" ${p.ProductID ? 'disabled' : ''}></label>
-      </div>
-      <label class="f mt">URL ຮູບພາບສິນຄ້າ <input id="pImg" value="${esc(p.ImageURL || '')}" placeholder="https://..."></label>
-      <div class="row mt" style="justify-content:flex-end">
-        <button type="button" class="btn" onclick="closeModal()">ຍົກເລີກ</button>
-        <button type="submit" class="btn pri">ບັນທຶກສິນຄ້າ</button>
-      </div>
-    </form>
-  `;
-  openModal(id ? 'ແກ້ໄຂສິນຄ້າ' : 'ເພີ່ມສິນຄ້າໃໝ່', html);
-}
-
-async function saveProduct(e, id) {
-  e.preventDefault();
-  const data = {
-    ProductID: id,
-    SKU: $('#pSKU').value.trim(),
-    ProductName: $('#pName').value.trim(),
-    Category: $('#pCat').value.trim(),
-    Unit: $('#pUnit').value,
-    MinStock: Number($('#pMin').value) || 0,
-    CostPrice: Number($('#pCost').value) || 0,
-    SellingPrice: Number($('#pSell').value) || 0,
-    CurrentStock: Number($('#pStock').value) || 0,
-    ImageURL: $('#pImg').value.trim()
+  const unitOpts = S.units.map(u => `<option ${u.UnitName === p.Unit ? 'selected' : ''}>${esc(u.UnitName)}</option>`).join('');
+  openModal(id ? 'ແກ້ໄຂສິນຄ້າ' : 'ເພີ່ມສິນຄ້າ', `
+    <div class="grid g2" style="gap:0 14px">
+      <label class="f">ຊື່ສິນຄ້າ *<input id="pName" value="${esc(p.ProductName)}"></label>
+      <label class="f">SKU / ບາໂຄດ<input id="pSku" value="${esc(p.SKU)}"></label>
+      <label class="f">ປະເພດ<input id="pCat" list="pCatList" value="${esc(p.Category)}"></label>
+      <label class="f">ໜ່ວຍນັບ<select id="pUnit">${unitOpts}</select></label>
+      <label class="f">ລາຄາທຶນ<input id="pCost" type="number" value="${esc(p.CostPrice ?? '')}"></label>
+      <label class="f">ລາຄາຂາຍ<input id="pPrice" type="number" value="${esc(p.SellingPrice ?? '')}"></label>
+      <label class="f">ສະຕັອກຂັ້ນຕ່ຳ<input id="pMin" type="number" value="${esc(p.MinStock ?? '')}"></label>
+      <label class="f">ສະຕັອກປັດຈຸບັນ<input id="pStock" type="number" step="any" value="${esc(p.CurrentStock ?? '')}"></label>
+    </div>
+    <datalist id="pCatList">${[...new Set(S.products.map(x => x.Category).filter(Boolean))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <label class="f">ຮູບສິນຄ້າ<input type="file" id="pImgFile" accept="image/*"></label>
+    <input type="hidden" id="pImg" value="${esc(p.ImageURL)}">
+    <div id="pImgPrev">${p.ImageURL ? `<img class="thumb" style="width:80px;height:80px" src="${esc(p.ImageURL)}"> <button class="btn sm" onclick="$('#pImg').value='';$('#pImgPrev').innerHTML=''">ເອົາຮູບອອກ</button>` : ''}</div>
+    <div class="row mt"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button>
+      <button class="btn pri" id="pSave">ບັນທຶກ</button></div>`);
+  $('#pImgFile').onchange = async e => {
+    const f = e.target.files[0]; if(!f) return;
+    $('#pImgPrev').textContent = 'ກຳລັງອັບໂຫຼດຮູບ...';
+    const b = await fileToBase64(f, 900);
+    const r = await run(() => api('uploadProductImage', b.base64, b.mime, f.name));
+    if(r){ $('#pImg').value = r.url; $('#pImgPrev').innerHTML = `<img class="thumb" style="width:80px;height:80px" src="${esc(r.url)}">`; }
+    else $('#pImgPrev').textContent = '';
   };
-
-  await run(async () => {
-    await api('saveProduct', data);
-    toast('ບັນທຶກຂໍ້ມູນສິນຄ້າຮຽບຮ້ອຍແລ້ວ');
-    closeModal();
-    loadProducts();
-  });
-}
-
-async function deleteProduct(id) {
-  if (!confirm('ທ່ານແນ່ໃຈ ຫຼື ບໍ່ວ່າຕ້ອງການລົບສິນຄ້ານີ້?')) return;
-  await run(async () => {
-    await api('deleteProduct', id);
-    toast('ລົບສິນຄ້າຮຽບຮ້ອຍແລ້ວ');
-    loadProducts();
-  });
-}
-
-function exportProducts() {
-  const rows = [
-    ['ProductID', 'SKU', 'ProductName', 'Category', 'CostPrice', 'SellingPrice', 'CurrentStock', 'Unit', 'MinStock'],
-    ...S.products.map(p => [p.ProductID, p.SKU, p.ProductName, p.Category, p.CostPrice, p.SellingPrice, p.CurrentStock, p.Unit, p.MinStock])
-  ];
-  downloadCSV(`products_${today()}.csv`, rows);
-}
-
-/* ======================= STOCK MOVEMENT ======================= */
-let stockData = [];
-async function loadStock() {
-  await refreshBase();
-  stockData = await run(() => api('getStockMovements')) || [];
-  renderStock();
-}
-
-function renderStock() {
-  const elSearch = $('#sxSearch');
-  if(!elSearch) return;
-
-  const q = elSearch.value.trim().toLowerCase();
-  const type = $('#sxType').value;
-  const from = $('#sxFrom').value;
-  const to = $('#sxTo').value;
-
-  const list = stockData.filter(s => {
-    const mQ = !q || String(s.ProductName).toLowerCase().includes(q) || String(s.Note).toLowerCase().includes(q);
-    const mT = type === 'all' || s.Type === type;
-    const mD = inRange(s.Date || s.CreatedAt, from, to);
-    return mQ && mT && mD;
-  });
-
-  const elTable = $('#stockTable');
-  if(elTable) {
-    elTable.innerHTML = list.length ? `
-      <table>
-        <tr>
-          <th>ວັນ-ເວລາ</th><th>ປະເພດ</th><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th>
-          <th>ໜ່ວຍ</th><th>ໝາຍເຫດ</th>
-        </tr>
-        ${list.map(s => `
-          <tr>
-            <td>${fmtDate(s.Date || s.CreatedAt)}</td>
-            <td><span class="tag ${s.Type === 'Stock In' ? 'in' : 'out'}">${s.Type === 'Stock In' ? 'ຮັບເຂົ້າ' : 'ເບິກອອກ'}</span></td>
-            <td><strong>${esc(s.ProductName)}</strong></td>
-            <td class="r num" style="font-weight:600;color:${s.Type === 'Stock In' ? 'var(--jade)' : 'var(--gold)'}">${s.Type === 'Stock In' ? '+' : '-'}${s.Quantity}</td>
-            <td>${esc(s.Unit || unitOf(s.ProductID))}</td>
-            <td>${esc(s.Note || '-')}</td>
-          </tr>
-        `).join('')}
-      </table>
-    ` : '<div class="empty">ບໍ່ພົບລາຍການເຄື່ອນໄຫວສະຕັອກ</div>';
-  }
-}
-
-function stockForm(type = null, pid = null) {
-  const prodOpts = S.products.map(p => `<option value="${esc(p.ProductID)}" ${p.ProductID === pid ? 'selected' : ''}>${esc(p.ProductName)} (ເຫຼືອ ${p.CurrentStock} ${esc(p.Unit || '')})</option>`).join('');
-  
-  const html = `
-    <form onsubmit="saveStock(event)">
-      <label class="f">ປະເພດລາຍການ
-        <select id="sxFormType" class="inp">
-          <option value="Stock In" ${type === 'Stock In' ? 'selected' : ''}>ນຳສິນຄ້າເຂົ້າ (+)</option>
-          <option value="Stock Out" ${type === 'Stock Out' ? 'selected' : ''}>ປັບຫຼຸດ / ເບິກອອກ (-)</option>
-        </select>
-      </label>
-      <label class="f mt">ເລືອກສິນຄ້າ <select id="sxProd" class="inp" required>${prodOpts}</select></label>
-      <label class="f mt">ຈຳນວນ <input type="number" step="any" min="0.01" id="sxQty" required></label>
-      <label class="f mt">ໝາຍເຫດ <textarea id="sxNote" placeholder="ເຊັ່ນ: ຮັບສິນຄ້າຈາກຜູ້ສະໜອງ, ສິນຄ້າເພ..."></textarea></label>
-      <div class="row mt" style="justify-content:flex-end">
-        <button type="button" class="btn" onclick="closeModal()">ຍົກເລີກ</button>
-        <button type="submit" class="btn pri">ບັນທຶກສະຕັອກ</button>
-      </div>
-    </form>
-  `;
-  openModal('ບັນທຶກປັບປຸງສະຕັອກ', html);
-}
-
-async function saveStock(e) {
-  e.preventDefault();
-  const data = {
-    Type: $('#sxFormType').value,
-    ProductID: $('#sxProd').value,
-    Quantity: Number($('#sxQty').value) || 0,
-    Note: $('#sxNote').value.trim(),
-    Date: new Date().toISOString()
+  $('#pSave').onclick = async () => {
+    const data = { productId:id, productName:$('#pName').value.trim(), sku:$('#pSku').value.trim(), category:$('#pCat').value.trim(),
+      unit:$('#pUnit').value, costPrice:$('#pCost').value, sellingPrice:$('#pPrice').value, minStock:$('#pMin').value,
+      currentStock:$('#pStock').value, imageUrl:$('#pImg').value };
+    if(!data.productName) return toast('ກະລຸນາປ້ອນຊື່ສິນຄ້າ', true);
+    if(data.sku && S.products.some(x => x.ProductID !== id && String(x.SKU).trim() === data.sku)) return toast('SKU ນີ້ມີສິນຄ້າອື່ນໃຊ້ແລ້ວ', true);
+    $('#pSave').disabled = true;
+    if(await run(() => api(id ? 'updateProduct' : 'addProduct', data), 'ບັນທຶກແລ້ວ')){ closeModal(); reloadActive(); }
+    else $('#pSave').disabled = false;
   };
-
-  await run(async () => {
-    await api('addStockMovement', data);
-    toast('ບັນທຶກປັບສະຕັອກຮຽບຮ້ອຍແລ້ວ');
-    closeModal();
-    loadStock();
-  });
 }
+async function delProduct(id){ if(!confirm('ລົບສິນຄ້ານີ້?')) return; if(await run(() => api('deleteProduct', id), 'ລົບແລ້ວ')) loadProducts(); }
 
-function exportStock() {
-  const rows = [
-    ['MovementID', 'Date', 'Type', 'ProductID', 'ProductName', 'Quantity', 'Note'],
-    ...stockData.map(s => [s.MovementID, s.Date || s.CreatedAt, s.Type, s.ProductID, s.ProductName, s.Quantity, s.Note])
-  ];
-  downloadCSV(`stock_movements_${today()}.csv`, rows);
+/* ======================= STOCK ======================= */
+let TX = [];
+async function loadStock(){ const [t] = await Promise.all([api('getTransactions'), refreshBase()]); TX = t; renderStock(); }
+['#sxType','#sxSearch','#sxFrom','#sxTo'].forEach(id => $(id).addEventListener('input', renderStock));
+function filteredTx(){
+  const ty = $('#sxType').value, q = norm($('#sxSearch').value), from = $('#sxFrom').value, to = $('#sxTo').value;
+  return TX.filter(t => (ty === 'all' || t.Type === ty) && (!q || norm(t.ProductName + ' ' + t.Note).includes(q)) && inRange(t.Date, from, to));
 }
+function renderStock(){
+  const list = filteredTx();
+  const tin = list.filter(t => t.Type === 'Stock In').reduce((s,t) => s + (Number(t.Quantity)||0), 0);
+  const tout = list.filter(t => t.Type === 'Stock Out').reduce((s,t) => s + (Number(t.Quantity)||0), 0);
+  $('#stockTable').innerHTML = list.length ? `<table><tr><th>ວັນທີ</th><th>ປະເພດ</th><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th>ໝາຍເຫດ</th><th>ຜູ້ບັນທຶກ</th><th></th></tr>
+    ${list.map(t => `<tr><td>${fmtDate(t.Date)}</td><td>${t.Type === 'Stock In' ? '<span class="tag in">ເຂົ້າ</span>' : '<span class="tag out">ອອກ</span>'}</td>
+      <td>${esc(t.ProductName)}</td><td class="r num">${t.Quantity}</td><td>${esc(t.Note)}</td><td><small>${esc(t.RecordedBy)}</small></td>
+      <td class="r" style="white-space:nowrap"><button class="btn sm" onclick="stockForm('${esc(t.TxID)}')">ແກ້ໄຂ</button>
+        <button class="btn sm danger" onclick="delTx('${esc(t.TxID)}')">ລົບ</button></td></tr>`).join('')}</table>
+    <div style="margin-top:10px;font-size:13px;color:var(--muted)" class="num">${list.length} ລາຍການ · ເຂົ້າລວມ ${tin} · ອອກລວມ ${tout}</div>`
+    : '<div class="empty">ບໍ່ມີລາຍການ — ກົດ "+ ບັນທຶກລາຍການ" ເມື່ອຮັບເຄື່ອງເຂົ້າ</div>';
+}
+function exportStock(){
+  downloadCSV('stock.csv', [['TxID','ວັນທີ','ປະເພດ','ສິນຄ້າ','ຈຳນວນ','ໝາຍເຫດ','ຜູ້ບັນທຶກ']]
+    .concat(filteredTx().map(t => [t.TxID, fmtDate(t.Date), t.Type === 'Stock In' ? 'ເຂົ້າ' : 'ອອກ', t.ProductName, t.Quantity, t.Note, t.RecordedBy])));
+}
+async function stockForm(txId, presetPid){
+  if(!S.products.length) await refreshBase();
+  const t = TX.find(x => x.TxID === txId) || { Type:'Stock In', ProductID:presetPid };
+  openModal(txId ? 'ແກ້ໄຂລາຍການສະຕັອກ' : 'ບັນທຶກເຂົ້າ-ອອກສະຕັອກ', `
+    <label class="f">ປະເພດ<select id="xType">${opt('Stock In','ເຂົ້າ (ຮັບເຄື່ອງ)',t.Type)}${opt('Stock Out','ອອກ (ເສຍ, ໝົດອາຍຸ, ເອົາໄປໃຊ້)',t.Type)}</select></label>
+    <label class="f">ສິນຄ້າ (ພິມຊື່ ຫຼື ລະຫັດ)<input id="xSearch" placeholder="ພິມຊື່ສິນຄ້າ ຫຼື SKU..." autocomplete="off"></label>
+    <div id="xPick" style="font-size:14px;color:var(--jade);font-weight:600;margin:-4px 0 6px"></div>
+    <div id="xList" style="max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:12px"></div>
+    <input type="hidden" id="xProd" value="${esc(t.ProductID || '')}">
+    <label class="f">ຈຳນວນ<input id="xQty" type="number" step="any" value="${esc(t.Quantity ?? '')}"></label>
+    <label class="f">ວັນທີ<input id="xDate" type="date" value="${t.Date ? ymd(t.Date) : today()}"></label>
+    <label class="f">ໝາຍເຫດ<input id="xNote" value="${esc(t.Note)}"></label>
+    <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="xSave">ບັນທຶກ</button></div>`);
+  const draw = () => {
+    const q = norm($('#xSearch').value), cur = String($('#xProd').value);
+    const all = S.products.filter(p => !q || norm(p.ProductName + ' ' + p.SKU).includes(q));
+    const l = all.slice(0, 60), sel = S.products.find(p => String(p.ProductID) === cur);
+    $('#xPick').textContent = sel ? '✓ ເລືອກແລ້ວ: ' + sel.ProductName + ' (ເຫຼືອ ' + sel.CurrentStock + ' ' + (sel.Unit || '') + ')' : '';
+    $('#xList').innerHTML = l.length ? l.map(p => `<div data-id="${esc(p.ProductID)}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);${String(p.ProductID) === cur ? 'background:var(--jade-soft);font-weight:600' : ''}">
+      ${esc(p.ProductName)}<br><small style="color:var(--muted)">${esc(p.SKU || '-')} · ເຫຼືອ ${esc(p.CurrentStock)} ${esc(p.Unit || '')}</small></div>`).join('')
+      + (all.length > 60 ? `<div class="empty">ສະແດງ 60 ຈາກ ${all.length} ລາຍການ — ພິມເພີ່ມເພື່ອກອງ</div>` : '')
+      : '<div class="empty">ບໍ່ພົບສິນຄ້າ</div>';
+  };
+  $('#xSearch').oninput = draw;
+  $('#xSearch').onkeydown = e => { if(e.key !== 'Enter') return; e.preventDefault(); const f = $('#xList [data-id]'); if(f) f.click(); };
+  $('#xList').onclick = e => { const d = e.target.closest('[data-id]'); if(!d) return; $('#xProd').value = d.dataset.id; draw(); $('#xQty').focus(); };
+  draw();
+  setTimeout(() => (t.ProductID ? $('#xQty') : $('#xSearch')).focus(), 50);
+  $('#xSave').onclick = async () => {
+    const d = { txId, type:$('#xType').value, productId:$('#xProd').value, quantity:$('#xQty').value, date:$('#xDate').value, note:$('#xNote').value };
+    if(!d.productId) return toast('ກະລຸນາເລືອກສິນຄ້າ (ແຕະລາຍການສິນຄ້າກ່ອນ)', true);
+    $('#xSave').disabled = true;
+    if(await run(() => api(txId ? 'updateStockTransaction' : 'recordStockTransaction', d), 'ບັນທຶກແລ້ວ')){ closeModal(); reloadActive(); }
+    else $('#xSave').disabled = false;
+  };
+}
+async function delTx(id){ if(!confirm('ລົບລາຍການນີ້? ສະຕັອກຈະຖືກປັບຄືນ')) return; if(await run(() => api('deleteStockTransaction', id), 'ລົບແລ້ວ')) loadStock(); }
 
 /* ======================= INVOICES ======================= */
-let invoicesData = [];
-async function loadInvoices() {
-  invoicesData = await run(() => api('getInvoices')) || [];
-  renderInvoices();
+let INV = [];
+async function loadInvoices(){ INV = await api('getInvoices'); renderInvoices(); }
+['#invFilter','#invSearch','#invFrom','#invTo','#invPay'].forEach(id => $(id).addEventListener('input', renderInvoices));
+const payLabel = m => ({ Cash:'ເງິນສົດ', Transfer:'ເງິນໂອນ', 'Cash+Transfer':'ສົດ + ໂອນ' }[m] || m || '');
+function filteredInvoices(){
+  const f = $('#invFilter').value, pm = $('#invPay').value, q = $('#invSearch').value.trim().toLowerCase(), from = $('#invFrom').value, to = $('#invTo').value;
+  return INV.filter(i => (f === 'all' || i.PaymentStatus === f) && (pm === 'all' || i.PaymentMethod === pm) && inRange(i.Date, from, to) &&
+    (!q || [i.InvoiceNo, i.CustomerName, i.Phone, i.Note].join(' ').toLowerCase().includes(q)));
+}
+function renderInvoices(){
+  const list = filteredInvoices();
+  const sum = list.reduce((s,i) => s + (Number(i.TotalAmount)||0), 0);
+  const unpaid = list.filter(i => i.PaymentStatus === 'Unpaid').reduce((s,i) => s + (Number(i.TotalAmount)||0), 0);
+  $('#invTable').innerHTML = list.length ? `<table><tr><th>ເລກບິນ</th><th>ວັນທີ</th><th>ລູກຄ້າ</th><th>ຊຳລະ</th><th class="r">ຍອດ</th><th>ສະຖານະ</th></tr>
+    ${list.map(i => `<tr class="click" onclick="showInvoice('${esc(i.InvoiceNo)}')"><td class="num">${esc(i.InvoiceNo)}</td><td>${fmtDate(i.Date)}</td>
+      <td>${esc(i.CustomerName || '-')}${i.Phone ? '<br><small>' + esc(i.Phone) + '</small>' : ''}</td><td>${esc(payLabel(i.PaymentMethod))}</td>
+      <td class="r num">${money(i.TotalAmount)}</td><td>${statusTag(i.PaymentStatus)}</td></tr>`).join('')}</table>
+    <div style="margin-top:10px;font-size:13px;color:var(--muted)" class="num">${list.length} ໃບ · ລວມ ${money(sum)} · ຍັງບໍ່ຈ່າຍ ${money(unpaid)}</div>`
+    : '<div class="empty">ບໍ່ມີໃບບິນໃນລາຍການນີ້</div>';
+}
+function exportInvoices(){
+  downloadCSV('invoices.csv', [['ເລກບິນ','ວັນທີ','ລູກຄ້າ','ເບີໂທ','ຍອດ','ວິທີຊຳລະ','ເງິນສົດ','ເງິນໂອນ','ສະຖານະ','ໝາຍເຫດ']]
+    .concat(filteredInvoices().map(i => [i.InvoiceNo, fmtDate(i.Date), i.CustomerName, i.Phone, i.TotalAmount, payLabel(i.PaymentMethod),
+      i.CashAmount ?? '', i.TransferAmount ?? '', i.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ', i.Note])));
 }
 
-function renderInvoices() {
-  const elSearch = $('#invSearch');
-  if(!elSearch) return;
-
-  const q = elSearch.value.trim().toLowerCase();
-  const st = $('#invFilter').value;
-  const pay = $('#invPay').value;
-  const from = $('#invFrom').value;
-  const to = $('#invTo').value;
-
-  const list = invoicesData.filter(i => {
-    const mQ = !q || String(i.InvoiceNumber).toLowerCase().includes(q) || String(i.CustomerName).toLowerCase().includes(q) || String(i.Phone).includes(q);
-    const mS = st === 'all' || i.PaymentStatus === st;
-    const mP = pay === 'all' || i.PaymentMethod === pay;
-    const mD = inRange(i.CreatedAt || i.Date, from, to);
-    return mQ && mS && mP && mD;
-  });
-
-  const elTable = $('#invTable');
-  if(elTable) {
-    elTable.innerHTML = list.length ? `
-      <table>
-        <tr>
-          <th>ເລກທີບິນ</th><th>ວັນ-ເວລາ</th><th>ລູກຄ້າ</th><th>ການຊຳລະເງິນ</th>
-          <th class="r">ຍອດເງິນລວມ</th><th>ສະຖານະ</th><th>ຈັດການ</th>
-        </tr>
-        ${list.map(i => `
-          <tr class="click" onclick="viewInvoiceDetail('${esc(i.InvoiceID)}')">
-            <td><code>${esc(i.InvoiceNumber || i.InvoiceID)}</code></td>
-            <td>${fmtDate(i.CreatedAt || i.Date)}</td>
-            <td><strong>${esc(i.CustomerName || 'ລູກຄ້າທົ່ວໄປ')}</strong></td>
-            <td>${esc(i.PaymentMethod || 'Cash')}</td>
-            <td class="r num" style="font-weight:700">${money(i.TotalAmount)}</td>
-            <td>${statusTag(i.PaymentStatus)}</td>
-            <td onclick="event.stopPropagation()">
-              <button class="btn sm" onclick="printReceipt('${esc(i.InvoiceID)}')">ພິມ</button>
-              ${i.PaymentStatus === 'Unpaid' ? `<button class="btn sm pri" onclick="payInvoice('${esc(i.InvoiceID)}')">ຮັບຊຳລະ</button>` : ''}
-            </td>
-          </tr>
-        `).join('')}
-      </table>
-    ` : '<div class="empty">ບໍ່ພົບຂໍ້ມູນໃບໄບິນ</div>';
-  }
+async function showInvoice(no){
+  openModal('ໃບບິນ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+  // ໃຫ້ແນ່ໃຈວ່າມີລາຍການສິນຄ້າແລ້ວ (ເພື່ອຫາໜ່ວຍນັບໃນໃບບິນ)
+  if(!S.products.length){ try{ await refreshBase(); }catch(e){} }
+  const [r, st] = await Promise.all([run(() => api('getInvoiceDetail', no)), api('getSettings').catch(() => ({}))]);
+  if(!r) return;
+  S.settings = st;
+  const inv = r.invoice;
+  $('#mBody').innerHTML = `<div id="receipt">${receiptHtml(inv, r.items, st)}</div>
+    <div class="row mt"><span>${statusTag(inv.PaymentStatus)}</span><span class="spacer"></span>
+      <button class="btn" onclick="toggleInv('${esc(no)}','${inv.PaymentStatus === 'Paid' ? 'Unpaid' : 'Paid'}')">
+        ${inv.PaymentStatus === 'Paid' ? 'ປ່ຽນເປັນຍັງບໍ່ຈ່າຍ' : 'ໝາຍວ່າຈ່າຍແລ້ວ'}</button>
+      <button class="btn" onclick="invoiceEditForm('${esc(no)}')">ແກ້ໄຂ</button>
+      <button class="btn pri" onclick="printReceipt()">ພິມໃບບິນ</button></div>`;
 }
+function receiptHtml(inv, items, st){
+  const sig  = String(inv.Signature || '');
+  const head = store.get('pos_bill_head');
+  const foot = store.get('pos_bill_foot') || 'ຂອບໃຈທີ່ອຸດໜູນ';
+  const qtySum = items.reduce((s,i) => s + N(i.Quantity), 0);
+  const cell = 'padding:2px 0;border-bottom:1px dotted #bbb';
+  const rows = items.map((i, k) => `
+    <tr><td colspan="3" style="padding:5px 0 0;border:0"><b>${k + 1}. ${esc(i.ProductName)}</b></td></tr>
+    <tr>
+      <td class="num" style="${cell}">${esc(i.Quantity)} ${esc(i.Unit || unitOf(i.ProductID))}</td>
+      <td class="r num" style="${cell}">@ ${money(i.UnitPrice)}</td>
+      <td class="r num" style="${cell}"><b>${money(i.LineTotal ?? N(i.Quantity) * N(i.UnitPrice))}</b></td>
+    </tr>`).join('');
+  return `<div style="text-align:center"><b style="font-size:18px">${esc(st.ShopName || 'ຮ້ານຂອງຂ້ອຍ')}</b><br>
+    <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small>
+    ${head ? `<div style="white-space:pre-line;margin-top:6px;font-size:13px">${esc(head)}</div>` : ''}</div>
+    <hr style="border:0;border-top:1px dashed #999">
+    <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ/ເວລາ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
+    <table style="margin-top:8px;width:100%;border-collapse:collapse">
+      <tr><th style="text-align:left">ຈຳນວນ</th><th class="r">ລາຄາຂາຍ/ໜ່ວຍ</th><th class="r">ລວມ</th></tr>
+      ${rows}
+    </table>
+    <div style="border-top:1px dashed #999;margin-top:8px;padding-top:6px;font-size:12px">
+      ທັງໝົດ ${items.length} ລາຍການ · ຈຳນວນລວມ ${qtySum}</div>
+    <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:6px">
+      <span>ລວມທັງໝົດ</span><span class="num">${money(inv.TotalAmount)}</span></div>
+    <small>ຊຳລະ: ${esc(payLabel(inv.PaymentMethod))}${inv.PaymentMethod === 'Cash+Transfer' ? ` (ສົດ ${money(inv.CashAmount)} / ໂອນ ${money(inv.TransferAmount)})` : ''}
+      · ${inv.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ'}${inv.Note ? '<br>ໝາຍເຫດ: ' + esc(inv.Note) : ''}</small>
+    ${sig.startsWith('data:image') ? `<div style="text-align:center;margin-top:10px"><img src="${esc(sig)}" style="width:180px" alt="ລາຍເຊັນ"><br><small>ລາຍເຊັນລູກຄ້າ</small></div>` : ''}
+    ${st.QRCodeURL && inv.PaymentStatus !== 'Paid' ? `<div style="text-align:center;margin-top:10px"><img src="${esc(st.QRCodeURL)}" style="width:160px" alt="QR"><br><small>ສະແກນເພື່ອໂອນ</small></div>` : ''}
+    <hr style="border:0;border-top:1px dashed #999">
+    <div style="text-align:center;white-space:pre-line;font-size:13px">${esc(foot)}</div>`;
+}
+function printReceipt(){
+  const w = window.open('', '_blank', 'width=420,height=640'); if(!w) return toast('ບຣາວເຊີບລັອກໜ້າຕ່າງພິມ — ກະລຸນາອະນຸຍາດ pop-up', true);
+  w.document.write(`<html><head><meta charset="utf-8"><title>ໃບບິນ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao+Looped:wght@400;700&display=swap" rel="stylesheet">
+    <style>body{font-family:"Noto Sans Lao Looped",sans-serif;width:72mm;margin:0 auto;font-size:13px}table{width:100%;border-collapse:collapse}
+    th,td{padding:3px 0;text-align:left;border-bottom:1px dotted #bbb}.r{text-align:right}</style></head>
+    <body>${$('#receipt').innerHTML}<script>setTimeout(function(){print()},700)<\/script></body></html>`);
+  w.document.close();
+}
+async function toggleInv(no, st){ if(await run(() => api('updateInvoicePaymentStatus', no, st), 'ອັບເດດແລ້ວ')){ showInvoice(no); if(CUR === 'invoices') loadInvoices(); } }
 
-async function viewInvoiceDetail(id) {
-  const inv = await run(() => api('getInvoiceDetail', id));
-  if (!inv) return;
-
-  const items = inv.items || [];
-  const html = `
-    <div>
-      <div class="row" style="margin-bottom:12px">
-        <div>
-          <h3 style="margin:0">ບິນເລກທີ: ${esc(inv.InvoiceNumber || inv.InvoiceID)}</h3>
-          <div style="font-size:13px;color:var(--muted)">ວັນທີ: ${fmtDate(inv.CreatedAt || inv.Date)}</div>
-        </div>
-        <span class="spacer"></span>
-        <div>${statusTag(inv.PaymentStatus)}</div>
-      </div>
-      <div class="panel" style="margin-bottom:12px;background:#F9FBF0">
-        <div><strong>ລູກຄ້າ:</strong> ${esc(inv.CustomerName || 'ລູກຄ້າທົ່ວໄປ')}</div>
-        <div><strong>ເບີໂທ:</strong> ${esc(inv.Phone || '-')}</div>
-        <div><strong>ວິທີຊຳລະ:</strong> ${esc(inv.PaymentMethod)}</div>
-      </div>
-      <table>
-        <tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ/ໜ່ວຍ</th><th class="r">ລວມ</th></tr>
-        ${items.map(i => `
-          <tr>
-            <td>${esc(i.ProductName)}</td>
-            <td class="r num">${i.Quantity}${esc(i.Unit || '')}</td>
-            <td class="r num">${money(i.UnitPrice)}</td>
-            <td class="r num">${money(Number(i.Quantity) * Number(i.UnitPrice))}</td>
-          </tr>
-        `).join('')}
-        <tr>
-          <td colspan="3" class="r" style="font-weight:bold">ຍອດເງິນລວມທັງໝົດ</td>
-          <td class="r num" style="font-weight:bold;font-size:16px;color:var(--jade)">${money(inv.TotalAmount)}</td>
-        </tr>
-      </table>
-      <div class="row mt" style="justify-content:flex-end">
-        <button class="btn" onclick="printReceipt('${esc(inv.InvoiceID)}')">🖨️ ພິມໃບເສັດ</button>
-        ${inv.PaymentStatus === 'Unpaid' ? `<button class="btn pri" onclick="payInvoice('${esc(inv.InvoiceID)}');closeModal();">ຊຳລະໜີ້ບິນນີ້</button>` : ''}
-      </div>
+async function invoiceEditForm(no){
+  const r = await run(() => api('getInvoiceDetail', no)); if(!r) return;
+  const inv = r.invoice;
+  openModal('ແກ້ໄຂໃບບິນ', `
+    <div class="grid g2" style="gap:0 14px">
+      <label class="f">ຊື່ລູກຄ້າ<input id="eName" value="${esc(inv.CustomerName)}"></label>
+      <label class="f">ເບີໂທ<input id="ePhone" value="${esc(inv.Phone)}"></label>
     </div>
-  `;
-  openModal('ລາຍລະອຽດໃບໄບິນ', html);
-}
-
-async function payInvoice(id) {
-  if (!confirm('ຢືນຢັນການຮັບຊຳລະເງິນສຳລັບບິນນີ້?')) return;
-  await run(async () => {
-    await api('updateInvoiceStatus', { invoiceId: id, status: 'Paid' });
-    toast('ອັບເດດສະຖານະການຊຳລະເງິນຮຽບຮ້ອຍແລ້ວ');
-    loadInvoices();
-  });
-}
-
-function exportInvoices() {
-  const rows = [
-    ['InvoiceID', 'InvoiceNumber', 'Date', 'CustomerName', 'Phone', 'TotalAmount', 'PaymentMethod', 'PaymentStatus'],
-    ...invoicesData.map(i => [i.InvoiceID, i.InvoiceNumber, i.CreatedAt || i.Date, i.CustomerName, i.Phone, i.TotalAmount, i.PaymentMethod, i.PaymentStatus])
-  ];
-  downloadCSV(`invoices_${today()}.csv`, rows);
+    <div class="tbl-wrap"><table id="eItems"><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th></tr>
+      ${r.items.map(i => `<tr data-pid="${esc(i.ProductID)}"><td>${esc(i.ProductName)}</td>
+        <td class="r"><input class="inp inline num eQ" type="number" step="any" min="0" value="${esc(i.Quantity)}" style="width:80px"></td>
+        <td class="r"><input class="inp inline num eP" type="number" min="0" value="${esc(i.UnitPrice)}" style="width:110px"></td></tr>`).join('')}</table></div>
+    <div id="eTotal" class="num" style="text-align:right;font-weight:700;margin:8px 0 12px"></div>
+    <div class="grid g2" style="gap:0 14px">
+      <label class="f">ວິທີຊຳລະ<select id="eMethod">${opt('Cash','ເງິນສົດ',inv.PaymentMethod)}${opt('Transfer','ເງິນໂອນ',inv.PaymentMethod)}${opt('Cash+Transfer','ສົດ + ໂອນ',inv.PaymentMethod)}</select></label>
+      <label class="f">ສະຖານະ<select id="eStatus">${opt('Paid','ຈ່າຍແລ້ວ',inv.PaymentStatus)}${opt('Unpaid','ຍັງບໍ່ຈ່າຍ',inv.PaymentStatus)}</select></label>
+    </div>
+    <div class="grid g2" id="eSplit" style="gap:0 14px">
+      <label class="f">ເງິນສົດ<input id="eCash" type="number" value="${esc(inv.CashAmount ?? '')}"></label>
+      <label class="f">ເງິນໂອນ<input id="eTr" type="number" value="${esc(inv.TransferAmount ?? '')}"></label>
+    </div>
+    <label class="f">ໝາຍເຫດ<input id="eNote" value="${esc(inv.Note)}"></label>
+    <p style="font-size:13px;color:var(--muted)">ການປ່ຽນຈຳນວນຈະປັບສະຕັອກໃຫ້ອັດຕະໂນມັດ. ຕັ້ງຈຳນວນເປັນ 0 ເພື່ອຄືນສິນຄ້າລາຍການນັ້ນ.</p>
+    <div class="row"><span class="spacer"></span><button class="btn" onclick="showInvoice('${esc(no)}')">ຍົກເລີກ</button><button class="btn pri" id="eSave">ບັນທຶກ</button></div>`);
+  const readItems = () => [...document.querySelectorAll('#eItems tr[data-pid]')].map(tr => ({ productId:tr.dataset.pid,
+    quantity:Number(tr.querySelector('.eQ').value)||0, unitPrice:Number(tr.querySelector('.eP').value)||0 }));
+  const calc = () => { const t = readItems().reduce((s,i) => s + i.quantity*i.unitPrice, 0); $('#eTotal').textContent = 'ລວມ ' + money(t); return t; };
+  const showSplit = () => $('#eSplit').style.display = $('#eMethod').value === 'Cash+Transfer' ? 'grid' : 'none';
+  $('#eItems').addEventListener('input', calc); $('#eMethod').onchange = showSplit; calc(); showSplit();
+  $('#eSave').onclick = async () => {
+    const total = calc(), method = $('#eMethod').value;
+    let cash = method === 'Cash' ? total : 0, tr = method === 'Transfer' ? total : 0;
+    if(method === 'Cash+Transfer'){ cash = Number($('#eCash').value)||0; tr = Number($('#eTr').value)||0;
+      if(Math.abs(cash + tr - total) > 0.001) return toast('ສົດ + ໂອນ ຕ້ອງເທົ່າກັບ ' + money(total), true); }
+    $('#eSave').disabled = true;
+    const ok = await run(() => api('updateInvoice', { invoiceNo:no, customerName:$('#eName').value, phone:$('#ePhone').value,
+      items:readItems(), paymentMethod:method, paymentStatus:$('#eStatus').value, note:$('#eNote').value }));
+    if(!ok){ $('#eSave').disabled = false; return; }
+    await run(() => api('setInvoiceSplitAmounts', no, method, cash, tr));
+    toast('ບັນທຶກແລ້ວ'); showInvoice(no); if(CUR === 'invoices') loadInvoices();
+  };
 }
 
 /* ======================= CUSTOMERS ======================= */
-async function loadCustomers() {
-  await refreshBase();
-  renderCustomers();
+async function loadCustomers(){ S.customers = await api('getCustomers'); renderCustomers(); }
+$('#custSearch').oninput = renderCustomers;
+function renderCustomers(){
+  const q = $('#custSearch').value.trim().toLowerCase();
+  const list = S.customers.filter(c => !q || (String(c.CustomerName) + ' ' + String(c.Phone)).toLowerCase().includes(q));
+  $('#custTable').innerHTML = list.length ? `<table><tr><th>ຊື່</th><th>ເບີໂທ</th><th>ທີ່ຢູ່</th><th class="r">ຊື້</th><th class="r">ຍອດຊື້ລວມ</th><th></th></tr>
+    ${list.map(c => `<tr class="click" onclick="custHistory('${esc(c.CustomerID)}')"><td><b>${esc(c.CustomerName)}</b></td><td>${esc(c.Phone)}</td>
+      <td>${esc(c.Address)}</td><td class="r num">${c.TotalOrders || 0}</td><td class="r num">${money(c.TotalSpent)}</td>
+      <td class="r"><button class="btn sm" onclick="event.stopPropagation();customerForm('${esc(c.CustomerID)}')">ແກ້ໄຂ</button>
+        <button class="btn sm danger" onclick="event.stopPropagation();delCustomer('${esc(c.CustomerID)}')">ລົບ</button></td></tr>`).join('')}</table>`
+    : '<div class="empty">ຍັງບໍ່ມີລູກຄ້າ</div>';
 }
-
-function renderCustomers() {
-  const elSearch = $('#custSearch');
-  if(!elSearch) return;
-
-  const q = elSearch.value.trim().toLowerCase();
-  const list = S.customers.filter(c => !q || String(c.CustomerName).toLowerCase().includes(q) || String(c.Phone).includes(q));
-
-  const elTable = $('#custTable');
-  if(elTable) {
-    elTable.innerHTML = list.length ? `
-      <table>
-        <tr><th>ຊື່ລູກຄ້າ</th><th>ເບີໂທ</th><th>ທີ່ຢູ່ / ໝາຍເຫດ</th><th>ຈັດການ</th></tr>
-        ${list.map(c => `
-          <tr>
-            <td><strong>${esc(c.CustomerName)}</strong></td>
-            <td>${esc(c.Phone || '-')}</td>
-            <td>${esc(c.Address || '-')}</td>
-            <td>
-              <button class="btn sm" onclick="customerForm('${esc(c.CustomerID)}')">ແກ້ໄຂ</button>
-              <button class="btn sm danger" onclick="deleteCustomer('${esc(c.CustomerID)}')">ລົບ</button>
-            </td>
-          </tr>
-        `).join('')}
-      </table>
-    ` : '<div class="empty">ບໍ່ພົບຂໍ້ມູນລູກຄ້າ</div>';
-  }
-}
-
-function customerForm(id = null) {
-  const c = S.customers.find(x => String(x.CustomerID) === String(id)) || {};
-  const html = `
-    <form onsubmit="saveCustomer(event, '${esc(c.CustomerID || '')}')">
-      <label class="f">ຊື່ລູກຄ້າ <input id="cName" value="${esc(c.CustomerName || '')}" required></label>
-      <label class="f mt">ເບີໂທລະສັບ <input id="cPhone" value="${esc(c.Phone || '')}"></label>
-      <label class="f mt">ທີ່ຢູ່ / ໝາຍເຫດ <textarea id="cAddr">${esc(c.Address || '')}</textarea></label>
-      <div class="row mt" style="justify-content:flex-end">
-        <button type="button" class="btn" onclick="closeModal()">ຍົກເລີກ</button>
-        <button type="submit" class="btn pri">ບັນທຶກຂໍ້ມູນ</button>
-      </div>
-    </form>
-  `;
-  openModal(id ? 'ແກ້ໄຂຂໍ້ມູນລູກຄ້າ' : 'ເພີ່ມລູກຄ້າໃໝ່', html);
-}
-
-async function saveCustomer(e, id) {
-  e.preventDefault();
-  const data = {
-    CustomerID: id,
-    CustomerName: $('#cName').value.trim(),
-    Phone: $('#cPhone').value.trim(),
-    Address: $('#cAddr').value.trim()
+function customerForm(id){
+  const c = S.customers.find(x => x.CustomerID === id) || {};
+  openModal(id ? 'ແກ້ໄຂລູກຄ້າ' : 'ເພີ່ມລູກຄ້າ', `
+    <label class="f">ຊື່ *<input id="cName" value="${esc(c.CustomerName)}"></label>
+    <label class="f">ເບີໂທ<input id="cPhone" value="${esc(c.Phone)}"></label>
+    <label class="f">ອີເມວ<input id="cEmail" value="${esc(c.Email)}"></label>
+    <label class="f">ທີ່ຢູ່<input id="cAddr" value="${esc(c.Address)}"></label>
+    <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="cSave">ບັນທຶກ</button></div>`);
+  $('#cSave').onclick = async () => {
+    const d = { customerId:id, customerName:$('#cName').value.trim(), phone:$('#cPhone').value, email:$('#cEmail').value, address:$('#cAddr').value };
+    if(!d.customerName) return toast('ກະລຸນາປ້ອນຊື່', true);
+    if(await run(() => api(id ? 'updateCustomer' : 'addCustomer', d), 'ບັນທຶກແລ້ວ')){ closeModal(); loadCustomers(); }
   };
-
-  await run(async () => {
-    await api('saveCustomer', data);
-    toast('ບັນທຶກຂໍ້ມູນລູກຄ້າຮຽບຮ້ອຍແລ້ວ');
-    closeModal();
-    loadCustomers();
-  });
 }
-
-async function deleteCustomer(id) {
-  if (!confirm('ທ່ານແນ່ໃຈ ຫຼື ບໍ່ວ່າຕ້ອງການລົບຂໍ້ມູນລູກຄ້ານີ້?')) return;
-  await run(async () => {
-    await api('deleteCustomer', id);
-    toast('ລົບຂໍ້ມູນລູກຄ້າຮຽບຮ້ອຍແລ້ວ');
-    loadCustomers();
-  });
+async function delCustomer(id){ if(!confirm('ລົບລູກຄ້ານີ້?')) return; if(await run(() => api('deleteCustomer', id), 'ລົບແລ້ວ')) loadCustomers(); }
+async function custHistory(id){
+  const c = S.customers.find(x => x.CustomerID === id) || {};
+  openModal('ລູກຄ້າ: ' + (c.CustomerName || ''), '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+  const h = await run(() => api('getCustomerOrderHistory', id)); if(!h) return;
+  const total = h.reduce((s,x) => s + (Number(x.TotalPrice)||0), 0);
+  $('#mBody').innerHTML = `<div class="row" style="margin-bottom:12px"><small>${esc(c.Phone || '')} ${esc(c.Email || '')} ${esc(c.Address || '')}</small><span class="spacer"></span>
+      <button class="btn sm" data-n="${esc(c.CustomerName)}" onclick="custDebt(this.dataset.n)">ເບິ່ງໜີ້</button>
+      <button class="btn sm pri" onclick="sellTo('${esc(id)}')">ຂາຍໃຫ້ລູກຄ້ານີ້</button></div>` +
+    (h.length ? `<div class="tbl-wrap"><table><tr><th>ວັນທີ</th><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
+    ${h.map(x => `<tr><td>${fmtDate(x.Date)}</td><td>${esc(x.ProductName)}</td><td class="r num">${x.Quantity}</td><td class="r num">${money(x.UnitPrice)}</td><td class="r num">${money(x.TotalPrice)}</td></tr>`).join('')}</table></div>
+    <div class="num" style="text-align:right;font-weight:700;margin-top:8px">ຊື້ລວມ ${money(total)}</div>`
+    : '<div class="empty">ລູກຄ້ານີ້ຍັງບໍ່ມີປະຫວັດການຊື້</div>');
 }
+function sellTo(id){
+  const c = S.customers.find(x => x.CustomerID === id) || {};
+  closeModal(); cart.customerId = id; cart.customerName = c.CustomerName || ''; cart.phone = String(c.Phone || ''); go('pos');
+}
+function custDebt(name){ closeModal(); $('#debtSearch').value = name; go('debts'); debtCustomerSummary(); }
 
 /* ======================= DEBTS ======================= */
-let debtData = [];
-async function loadDebts() {
-  await refreshBase();
-  const book = $('#debtBook') ? $('#debtBook').value : '1';
-  debtData = await run(() => api('getDebts', book)) || [];
+const DEBT_FN = {
+  1:{ list:'getDebtRecords', sum:'getDebtSummary', save:'saveDebtRecord', update:'updateDebtRecord', status:'updateDebtStatus',
+      del:'deleteDebtRecord', upload:'uploadDebtImage', analyze:'analyzeDebtImage', cust:'getCustomerDebtSummary' },
+  2:{ list:'debt2_getRecords', sum:'debt2_getSummary', save:'debt2_saveRecord', update:'debt2_updateRecord', status:'debt2_updateStatus',
+      del:'debt2_deleteRecord', upload:'debt2_uploadImage', analyze:'debt2_analyzeImage', cust:'debt2_getCustomerSummary' },
+  3:{ list:'debt3_getRecords', sum:'debt3_getSummary', save:'debt3_saveRecord', update:'debt3_updateRecord', status:'debt3_updateStatus',
+      del:'debt3_deleteRecord', upload:'debt3_uploadImage', analyze:'debt3_analyzeImage', cust:'debt3_getCustomerSummary' }
+};
+const dfn = k => DEBT_FN[$('#debtBook').value][k];
+let DEBTS = [];
+$('#debtBook').value = store.get('pos_debt_book') || '1';
+$('#debtBook').onchange = () => { store.set('pos_debt_book', $('#debtBook').value); loadDebts(); };
+$('#debtFilter').onchange = renderDebts;
+$('#debtSearch').oninput = renderDebts;
+
+async function loadDebts(){
+  const [list, sum] = await Promise.all([api(dfn('list')), api(dfn('sum'))]);
+  DEBTS = list;
+  const c = (lbl, x) => `<div class="panel stat"><div class="lbl">${lbl}</div><div class="val num">${money(x.total)}</div>
+    <div class="sub num">ຄ້າງ ${money(x.unpaid)} · ${x.count} ລາຍການ</div></div>`;
+  $('#debtSummary').innerHTML = `<div class="panel stat warn"><div class="lbl">ໜີ້ຄ້າງທັງໝົດ</div><div class="val num">${money(sum.totalUnpaidAll)}</div>
+    <div class="sub">${sum.unpaidCountAll} ລາຍການ</div></div>${c('ມື້ນີ້', sum.daily)}${c('ອາທິດນີ້', sum.weekly)}${c('ເດືອນນີ້', sum.monthly)}`;
   renderDebts();
 }
-
-function renderDebts() {
-  const elSearch = $('#debtSearch');
-  if(!elSearch) return;
-
-  const q = elSearch.value.trim().toLowerCase();
-  const filter = $('#debtFilter').value;
-
-  const list = debtData.filter(d => {
-    const mQ = !q || norm(d.CustomerName).includes(norm(q)) || norm(d.Note).includes(norm(q));
-    const mF = filter === 'all' || d.Status === filter;
-    return mQ && mF;
-  });
-
-  const unpaidTotal = debtData.filter(d => d.Status === 'Unpaid').reduce((s, d) => s + Number(d.Amount || 0), 0);
-  const paidTotal = debtData.filter(d => d.Status === 'Paid').reduce((s, d) => s + Number(d.Amount || 0), 0);
-
-  const elSummary = $('#debtSummary');
-  if(elSummary) {
-    elSummary.innerHTML = `
-      <div class="panel stat warn"><div class="lbl">ຍອດໜີ້ຄົງຄ້າງທັງໝົດ</div><div class="val num">${money(unpaidTotal)}</div></div>
-      <div class="panel stat"><div class="lbl">ຊຳລະແລ້ວທັງໝົດ</div><div class="val num">${money(paidTotal)}</div></div>
-    `;
-  }
-
-  const elTable = $('#debtTable');
-  if(elTable) {
-    elTable.innerHTML = list.length ? `
-      <table>
-        <tr>
-          <th>ວັນທີ</th><th>ຊື່ລູກຄ້າ</th><th class="r">ຈຳນວນເງິນ</th>
-          <th>ລາຍການ / ໝາຍເຫດ</th><th>ສະຖານະ</th><th>ຈັດການ</th>
-        </tr>
-        ${list.map(d => `
-          <tr>
-            <td>${fmtDay(d.Date || d.CreatedAt)}</td>
-            <td><strong>${esc(d.CustomerName)}</strong></td>
-            <td class="r num" style="font-weight:700;color:${d.Status === 'Unpaid' ? 'var(--red)' : 'var(--jade)'}">${money(d.Amount)}</td>
-            <td>${esc(d.Note || '-')}</td>
-            <td>${statusTag(d.Status)}</td>
-            <td>
-              ${d.Status === 'Unpaid' ? `<button class="btn sm pri" onclick="payDebt('${esc(d.DebtID)}')">ຊຳລະໜີ້</button>` : ''}
-              <button class="btn sm danger" onclick="deleteDebt('${esc(d.DebtID)}')">ລົບ</button>
-            </td>
-          </tr>
-        `).join('')}
-      </table>
-    ` : '<div class="empty">ບໍ່ພົບລາຍການບັນທຶກໜີ້ສິນ</div>';
-  }
+function renderDebts(){
+  const f = $('#debtFilter').value, q = $('#debtSearch').value.trim().toLowerCase();
+  const list = DEBTS.filter(d => (f === 'all' || d.Status === f) && (!q || String(d.CustomerName).toLowerCase().includes(q)));
+  $('#debtTable').innerHTML = list.length ? `<table><tr><th>ວັນທີເອົາເຄື່ອງ</th><th>ລູກຄ້າ</th><th>ລາຍການ</th><th class="r">ຍອດ</th><th>ສະຖານະ</th><th></th></tr>
+    ${list.map(d => `<tr class="click" onclick="debtForm('${esc(d.DebtID)}')"><td>${fmtDay(d.DateTaken)}</td>
+      <td><b>${esc(d.CustomerName)}</b>${d.Phone ? '<br><small>' + esc(d.Phone) + '</small>' : ''}</td>
+      <td><small>${d.Items.map(i => esc(i.name)).join(', ')}</small></td><td class="r num">${money(d.TotalAmount)}</td><td>${statusTag(d.Status)}</td>
+      <td class="r"><button class="btn sm" onclick="event.stopPropagation();toggleDebt('${esc(d.DebtID)}','${d.Status === 'Paid' ? 'Unpaid' : 'Paid'}')">
+        ${d.Status === 'Paid' ? 'ຍົກເລີກຈ່າຍ' : 'ຈ່າຍແລ້ວ'}</button></td></tr>`).join('')}</table>`
+    : '<div class="empty">ບໍ່ມີລາຍການໜີ້</div>';
 }
+async function toggleDebt(id, st){ if(await run(() => api(dfn('status'), id, st), 'ອັບເດດແລ້ວ')) loadDebts(); }
 
-function debtForm() {
-  const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerName)}">${esc(c.CustomerName)}</option>`).join('');
-  const html = `
-    <form onsubmit="saveDebt(event)">
-      <label class="f">ປຶ້ມບັນທຶກໜີ້
-        <select id="dBook" class="inp">
-          <option value="1">ເຫຼັ້ມ 1</option><option value="2">ເຫຼັ້ມ 2</option><option value="3">ເຫຼັ້ມ 3</option>
-        </select>
-      </label>
-      <label class="f mt">ຊື່ລູກຄ້າ
-        <input id="dName" list="custDebtList" placeholder="ພິມຊື່ ຫຼື ເລືອກຈາກລາຍການ" required>
-        <datalist id="custDebtList">${custOpts}</datalist>
-      </label>
-      <label class="f mt">ຈຳນວນເງິນໜີ້ <input type="number" step="any" id="dAmount" required></label>
-      <label class="f mt">ວັນທີບັນທຶກ <input type="date" id="dDate" value="${today()}"></label>
-      <label class="f mt">ລາຍລະອຽດ / ສິນຄ້າທີ່ຄ້າງ <textarea id="dNote"></textarea></label>
-      <div class="row mt" style="justify-content:flex-end">
-        <button type="button" class="btn" onclick="closeModal()">ຍົກເລີກ</button>
-        <button type="submit" class="btn pri">ບັນທຶກລາຍການໜີ້</button>
-      </div>
-    </form>
-  `;
-  openModal('ບັນທຶກລາຍການໜີ້ລູກໜີ້', html);
-  const elDebtBook = $('#debtBook');
-  if(elDebtBook) $('#dBook').value = elDebtBook.value;
-}
+function debtForm(id){
+  const d = DEBTS.find(x => x.DebtID === id) || { Items:[], Status:'Unpaid' };
+  let items = d.Items.map(i => ({ name:i.name, price:i.price }));
+  openModal(id ? 'ແກ້ໄຂລາຍການໜີ້' : 'ບັນທຶກໜີ້ໃໝ່', `
+    ${id ? '' : `<div class="panel" style="background:var(--gold-soft);border-color:#EBD9A6;margin-bottom:14px">
+      <b>ອ່ານຈາກຮູບໃບບັນທຶກ</b><br><small>ຖ່າຍຮູບ ຫຼື ເລືອກຮູບໃບໜີ້ ແລ້ວ AI ຈະປ້ອນຂໍ້ມູນໃຫ້ (ກວດຄືນກ່ອນບັນທຶກ)</small>
+      <input type="file" id="dImgFile" accept="image/*" capture="environment" class="inp"><div id="dAiState" style="font-size:13px;margin-top:6px"></div></div>`}
+    ${d.ImageURL ? `<a href="${esc(d.ImageURL)}" target="_blank"><img src="${esc(d.ImageURL)}" style="max-width:160px;border-radius:8px" alt="ຮູບໃບບັນທຶກ"></a>` : ''}
+    <input type="hidden" id="dImg" value="${esc(d.ImageURL)}">
+    <div class="grid g2" style="gap:0 14px">
+      <label class="f">ຊື່ລູກຄ້າ *<input id="dName" list="dCustList" value="${esc(d.CustomerName)}"></label>
+      <label class="f">ເບີໂທ<input id="dPhone" value="${esc(d.Phone)}"></label>
+      <label class="f">ວັນທີເອົາເຄື່ອງ<input id="dDate" type="date" value="${d.DateTaken ? ymd(d.DateTaken) : today()}"></label>
+      <label class="f">ສະຖານະ<select id="dStatus"><option value="Unpaid">ຍັງຄ້າງ</option><option value="Paid" ${d.Status === 'Paid' ? 'selected' : ''}>ຈ່າຍແລ້ວ</option></select></label>
+    </div>
+    <datalist id="dCustList">${[...new Set(DEBTS.map(x => x.CustomerName))].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+    <b>ລາຍການເຄື່ອງ</b><div id="dItems"></div>
+    <button class="btn sm" id="dAdd" style="margin:6px 0 12px">+ ເພີ່ມລາຍການ</button>
+    <label class="f">ໝາຍເຫດ<input id="dNote" value="${esc(d.Note)}"></label>
+    <div class="row">${id ? '<button class="btn danger" id="dDel">ລົບ</button>' : ''}<span class="spacer"></span>
+      <button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="dSave">ບັນທຶກ</button></div>`);
 
-async function saveDebt(e) {
-  e.preventDefault();
-  const book = $('#dBook').value;
-  const data = {
-    CustomerName: $('#dName').value.trim(),
-    Amount: Number($('#dAmount').value) || 0,
-    Date: $('#dDate').value,
-    Note: $('#dNote').value.trim(),
-    Status: 'Unpaid'
+  const drawItems = () => {
+    const total = items.reduce((s,i) => s + (Number(i.price)||0), 0);
+    $('#dItems').innerHTML = items.map((it,k) => `<div class="row" style="margin-top:6px">
+      <input class="inp" style="flex:2;margin:0" placeholder="ຊື່ເຄື່ອງ" value="${esc(it.name)}" oninput="this.closest('#dItems')._items[${k}].name=this.value">
+      <input class="inp num" style="flex:1;margin:0" type="number" placeholder="ລາຄາ" value="${it.price}" onchange="this.closest('#dItems')._items[${k}].price=this.value;this.closest('#dItems')._draw()">
+      <button class="btn sm danger" onclick="this.closest('#dItems')._items.splice(${k},1);this.closest('#dItems')._draw()">×</button></div>`).join('')
+      + `<div style="text-align:right;font-weight:700;margin-top:8px" class="num">ລວມ ${money(total)}</div>`;
+  };
+  $('#dItems')._items = items; $('#dItems')._draw = drawItems; drawItems();
+  $('#dAdd').onclick = () => { items.push({ name:'', price:0 }); drawItems(); };
+
+  if(!id) $('#dImgFile').onchange = async e => {
+    const f = e.target.files[0]; if(!f) return;
+    const st = $('#dAiState'); st.textContent = 'ກຳລັງອັບໂຫຼດ ແລະ ໃຫ້ AI ອ່ານຮູບ...';
+    try{
+      const b = await fileToBase64(f);
+      const [up, ai] = await Promise.all([api(dfn('upload'), b.base64, b.mime, f.name), api(dfn('analyze'), b.base64, b.mime)]);
+      if(up.success) $('#dImg').value = up.url;
+      if(!ai.success){ st.textContent = ai.message; st.style.color = 'var(--red)'; return; }
+      const x = ai.data;
+      if(x.customerName) $('#dName').value = x.customerName;
+      if(x.phone) $('#dPhone').value = x.phone;
+      if(x.dateTaken) $('#dDate').value = x.dateTaken;
+      $('#dStatus').value = x.status;
+      items.splice(0, items.length, ...x.items); drawItems();
+      st.style.color = 'var(--jade)'; st.textContent = `AI ອ່ານໄດ້ ${x.items.length} ລາຍການ — ກະລຸນາກວດຄືນກ່ອນບັນທຶກ`;
+    }catch(err){ st.textContent = err.message; st.style.color = 'var(--red)'; }
   };
 
-  await run(async () => {
-    await api('addDebt', book, data);
-    toast('ບັນທຶກຂໍ້ມູນໜີ້ສິນຮຽບຮ້ອຍແລ້ວ');
-    closeModal();
-    loadDebts();
-  });
+  $('#dSave').onclick = async () => {
+    const data = { debtId:id, customerName:$('#dName').value.trim(), phone:$('#dPhone').value, dateTaken:$('#dDate').value,
+      status:$('#dStatus').value, note:$('#dNote').value, imageUrl:$('#dImg').value,
+      items: items.filter(i => String(i.name).trim()).map(i => ({ name:String(i.name).trim(), price:Number(i.price)||0 })) };
+    if(!data.customerName) return toast('ກະລຸນາປ້ອນຊື່ລູກຄ້າ', true);
+    if(!data.items.length) return toast('ກະລຸນາເພີ່ມລາຍການເຄື່ອງຢ່າງໜ້ອຍ 1 ລາຍການ', true);
+    $('#dSave').disabled = true;
+    if(await run(() => api(id ? dfn('update') : dfn('save'), data), 'ບັນທຶກແລ້ວ')){ closeModal(); loadDebts(); }
+    else $('#dSave').disabled = false;
+  };
+  if(id) $('#dDel').onclick = async () => { if(!confirm('ລົບລາຍການໜີ້ນີ້?')) return;
+    if(await run(() => api(dfn('del'), id), 'ລົບແລ້ວ')){ closeModal(); loadDebts(); } };
 }
 
-async function payDebt(id) {
-  if (!confirm('ຢືນຢັນການຮັບຊຳລະໜີ້ລາຍການນີ້?')) return;
-  const book = $('#debtBook').value;
-  await run(async () => {
-    await api('updateDebtStatus', book, id, 'Paid');
-    toast('ອັບເດດການຊຳລະໜີ້ຮຽບຮ້ອຍແລ້ວ');
-    loadDebts();
-  });
+function exportDebts(){
+  const f = $('#debtFilter').value, q = $('#debtSearch').value.trim().toLowerCase();
+  const list = DEBTS.filter(d => (f === 'all' || d.Status === f) && (!q || String(d.CustomerName).toLowerCase().includes(q)));
+  downloadCSV('debts.csv', [['DebtID','ວັນທີເອົາເຄື່ອງ','ລູກຄ້າ','ເບີໂທ','ລາຍການ','ຍອດ','ສະຖານະ','ໝາຍເຫດ']]
+    .concat(list.map(d => [d.DebtID, fmtDay(d.DateTaken), d.CustomerName, d.Phone, d.Items.map(i => i.name + ' ' + i.price).join('; '),
+      d.TotalAmount, d.Status === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງຄ້າງ', d.Note])));
 }
-
-async function deleteDebt(id) {
-  if (!confirm('ທ່ານແນ່ໃຈ ຫຼື ບໍ່ວ່າຕ້ອງການລົບລາຍການໜີ້ນີ້?')) return;
-  const book = $('#debtBook').value;
-  await run(async () => {
-    await api('deleteDebt', book, id);
-    toast('ລົບລາຍການໜີ້ຮຽບຮ້ອຍແລ້ວ');
-    loadDebts();
-  });
+async function runDebug(){
+  $('#dbgOut').textContent = 'ກຳລັງກວດ...';
+  try{ $('#dbgOut').textContent = await api('debugCheckDataForWeb'); }catch(e){ $('#dbgOut').textContent = e.message; }
 }
-
-function debtCustomerSummary() {
-  const summary = {};
-  debtData.forEach(d => {
-    if (!summary[d.CustomerName]) summary[d.CustomerName] = { unpaid: 0, paid: 0 };
-    if (d.Status === 'Unpaid') summary[d.CustomerName].unpaid += Number(d.Amount || 0);
-    else summary[d.CustomerName].paid += Number(d.Amount || 0);
-  });
-
-  const list = Object.keys(summary).map(k => ({ name: k, ...summary[k] }));
-  const html = `
-    <div style="max-height:60vh;overflow:auto">
-      <table>
-        <tr><th>ຊື່ລູກຄ້າ</th><th class="r">ຍອດຄົງຄ້າງ</th><th class="r">ຊຳລະແລ້ວ</th></tr>
-        ${list.map(i => `
-          <tr>
-            <td><strong>${esc(i.name)}</strong></td>
-            <td class="r num" style="color:var(--red);font-weight:600">${money(i.unpaid)}</td>
-            <td class="r num" style="color:var(--jade)">${money(i.paid)}</td>
-          </tr>
-        `).join('')}
-      </table>
+async function debtCustomerSummary(){
+  const name = $('#debtSearch').value.trim(); if(!name) return toast('ພິມຊື່ລູກຄ້າກ່ອນ', true);
+  const r = await run(() => api(dfn('cust'), name)); if(!r) return;
+  openModal('ຍອດໜີ້: ' + r.customerName, `
+    <div class="grid g3" style="gap:10px">
+      <div class="panel stat warn"><div class="lbl">ຍັງຄ້າງ</div><div class="val num">${money(r.unpaidTotal)}</div></div>
+      <div class="panel stat"><div class="lbl">ຈ່າຍແລ້ວ</div><div class="val num">${money(r.paidTotal)}</div></div>
+      <div class="panel stat"><div class="lbl">ລວມທັງໝົດ</div><div class="val num">${money(r.totalAmount)}</div><div class="sub">${r.recordCount} ຄັ້ງ</div></div>
     </div>
-  `;
-  openModal('ສະຫຼຸບຍອດໜີ້ສິນແຍກຕາມລູກຄ້າ', html);
-}
-
-function exportDebts() {
-  const book = $('#debtBook').value;
-  const rows = [
-    ['DebtID', 'Date', 'CustomerName', 'Amount', 'Note', 'Status'],
-    ...debtData.map(d => [d.DebtID, d.Date || d.CreatedAt, d.CustomerName, d.Amount, d.Note, d.Status])
-  ];
-  downloadCSV(`debts_book${book}_${today()}.csv`, rows);
+    <div class="tbl-wrap mt"><table><tr><th>ວັນທີ</th><th>ເຄື່ອງ</th><th class="r">ລາຄາ</th><th>ສະຖານະ</th></tr>
+    ${r.items.map(i => `<tr><td>${fmtDay(i.date)}</td><td>${esc(i.name)}</td><td class="r num">${money(i.price)}</td><td>${statusTag(i.status)}</td></tr>`).join('')}</table></div>`);
 }
 
 /* ======================= SETTINGS ======================= */
-async function loadSettings() {
-  const elUrl = $('#cfgUrl');
-  if(elUrl) elUrl.value = store.get('pos_api_url') || DEFAULT_API_URL;
-  
-  const elToken = $('#cfgToken');
-  if(elToken) elToken.value = store.get('pos_api_token') || DEFAULT_API_TOKEN;
-
-  const st = await run(() => api('getSettings')) || {};
-  S.settings = st;
-
-  if($('#sName')) $('#sName').value = st.ShopName || '';
-  if($('#sPhone')) $('#sPhone').value = st.Phone || '';
-  if($('#sAddr')) $('#sAddr').value = st.Address || '';
-  if($('#sHead')) $('#sHead').value = st.HeaderMsg || '';
-  if($('#sFoot')) $('#sFoot').value = st.FooterMsg || '';
-  if(st.QRCodeURL && $('#sQrPrev')) {
-    $('#sQrPrev').innerHTML = `<img src="${esc(st.QRCodeURL)}" style="max-width:120px;margin-top:8px;border-radius:6px">`;
-  }
-  if($('#sKeyState')) $('#sKeyState').textContent = st.HasGeminiKey ? '(ມີ Key ໃນລະບົບແລ້ວ)' : '(ຍັງບໍ່ມີ Key)';
-
+async function loadSettings(){
+  $('#cfgUrl').value = store.get('pos_api_url') || DEFAULT_API_URL; $('#cfgToken').value = store.get('pos_api_token') || DEFAULT_API_TOKEN;
+  $('#sHead').value = store.get('pos_bill_head'); $('#sFoot').value = store.get('pos_bill_foot');
+  if(!(store.get('pos_api_url') || DEFAULT_API_URL)) return;
+  const [st, u] = await Promise.all([api('getSettings'), api('getUnits')]);
+  S.settings = st; S.units = u;
+  $('#sName').value = st.ShopName || ''; $('#sPhone').value = st.ShopPhone || ''; $('#sAddr').value = st.ShopAddress || '';
+  $('#sKeyState').innerHTML = st.HasGeminiKey ? '<span class="tag paid">ຕັ້ງຄ່າແລ້ວ</span>' : '<span class="tag unpaid">ຍັງບໍ່ໄດ້ຕັ້ງ</span>';
+  $('#sQrPrev').innerHTML = st.QRCodeURL ? `<img src="${esc(st.QRCodeURL)}" style="width:120px;margin-bottom:10px" alt="QR">` : '';
+  $('#sQrPrev').dataset.url = st.QRCodeURL || '';
   renderUnits();
 }
-
-function saveConn() {
-  const url = $('#cfgUrl').value.trim();
-  const token = $('#cfgToken').value.trim();
-  store.set('pos_api_url', url);
-  store.set('pos_api_token', token);
-  toast('ບັນທຶກການຕັ້ງຄ່າການເຊື່ອມຕໍ່ຮຽບຮ້ອຍແລ້ວ');
-  runDebug();
+$('#sHead').oninput = e => store.set('pos_bill_head', e.target.value);
+$('#sFoot').oninput = e => store.set('pos_bill_foot', e.target.value);
+async function saveConn(){
+  store.set('pos_api_url', $('#cfgUrl').value.trim()); store.set('pos_api_token', $('#cfgToken').value.trim());
+  if(await run(() => api('getSettings'), 'ເຊື່ອມຕໍ່ສຳເລັດ')){ loadSettings(); applyBrand(); }
 }
-
-async function saveShop() {
-  const fileComp = $('#sQrFile');
-  let qrBase64 = null;
-  if (fileComp && fileComp.files && fileComp.files[0]) {
-    const res = await fileToBase64(fileComp.files[0]);
-    qrBase64 = res.base64;
-  }
-
-  const data = {
-    ShopName: $('#sName').value.trim(),
-    Phone: $('#sPhone').value.trim(),
-    Address: $('#sAddr').value.trim(),
-    HeaderMsg: $('#sHead').value.trim(),
-    FooterMsg: $('#sFoot').value.trim(),
-    GeminiKey: $('#sKey').value.trim(),
-    QRBase64: qrBase64
+$('#sQrFile').onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  const b = await fileToBase64(f, 800);
+  const r = await run(() => api('uploadProductImage', b.base64, b.mime, 'qr_' + f.name));
+  if(r){ $('#sQrPrev').dataset.url = r.url; $('#sQrPrev').innerHTML = `<img src="${esc(r.url)}" style="width:120px;margin-bottom:10px" alt="QR">`; toast('ອັບໂຫຼດແລ້ວ — ກົດບັນທຶກຂໍ້ມູນຮ້ານ'); }
+};
+async function saveShop(){
+  const p = { shopName:$('#sName').value, shopPhone:$('#sPhone').value, shopAddress:$('#sAddr').value, qrCodeUrl:$('#sQrPrev').dataset.url || '' };
+  if($('#sKey').value.trim()) p.geminiApiKey = $('#sKey').value.trim();
+  if(await run(() => api('saveSettings', p), 'ບັນທຶກແລ້ວ')){ $('#sKey').value = ''; loadSettings(); applyBrand(); }
+}
+function renderUnits(){
+  $('#unitList').innerHTML = S.units.length ? `<table>${S.units.map(u => `<tr><td>${esc(u.UnitName)}</td>
+    <td>${(u.IsWeight === true || String(u.IsWeight).toLowerCase() === 'true') ? '<small>ຊັ່ງນ້ຳໜັກ</small>' : ''}</td>
+    <td class="r"><button class="btn sm" onclick="unitForm('${esc(u.UnitID)}')">ແກ້ໄຂ</button>
+    <button class="btn sm danger" onclick="delUnit('${esc(u.UnitID)}')">ລົບ</button></td></tr>`).join('')}</table>` : '<div class="empty">ຍັງບໍ່ມີໜ່ວຍນັບ</div>';
+}
+function unitForm(id){
+  const u = S.units.find(x => x.UnitID === id) || {};
+  const w = u.IsWeight === true || String(u.IsWeight).toLowerCase() === 'true';
+  openModal(id ? 'ແກ້ໄຂໜ່ວຍນັບ' : 'ເພີ່ມໜ່ວຍນັບ', `
+    <label class="f">ຊື່ໜ່ວຍ<input id="uName" value="${esc(u.UnitName)}"></label>
+    <label style="display:flex;gap:8px;align-items:center;margin-bottom:14px"><input type="checkbox" id="uW" ${w ? 'checked' : ''}> ຂາຍຕາມນ້ຳໜັກ (ໃສ່ທົດສະນິຍົມໄດ້)</label>
+    <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="uSave">ບັນທຶກ</button></div>`);
+  $('#uSave').onclick = async () => {
+    const d = { unitId:id, unitName:$('#uName').value.trim(), isWeight:$('#uW').checked };
+    if(!d.unitName) return toast('ກະລຸນາປ້ອນຊື່', true);
+    if(await run(() => api(id ? 'updateUnit' : 'addUnit', d), 'ບັນທຶກແລ້ວ')){ closeModal(); loadSettings(); }
   };
+}
+async function delUnit(id){ if(!confirm('ລົບໜ່ວຍນັບນີ້?')) return; if(await run(() => api('deleteUnit', id), 'ລົບແລ້ວ')) loadSettings(); }
 
-  await run(async () => {
-    await api('saveSettings', data);
-    toast('ບັນທຶກຂໍ້ມູນຮ້ານຄ້າຮຽບຮ້ອຍແລ້ວ');
-    loadSettings();
-  });
+async function applyBrand(){
+  try{ const st = await api('getSettings'); S.settings = st;
+    if(st.ShopName){ $('#brandSub').textContent = st.ShopName; document.title = st.ShopName + ' — POS'; } }catch(e){}
 }
 
-function renderUnits() {
-  const elList = $('#unitList');
-  if(!elList) return;
-
-  elList.innerHTML = S.units.length ? `
-    <table>
-      <tr><th>ຊື່ໜ່ວຍນັບ</th><th>ເປັນສິນຄ້ານ້ຳໜັກ/ທົດສະນິຍົມ</th><th>ຈັດການ</th></tr>
-      ${S.units.map(u => `
-        <tr>
-          <td><strong>${esc(u.UnitName)}</strong></td>
-          <td>${u.IsWeight ? 'ແມ່ນ (ທົດສະນິຍົມ)' : 'ບໍ່ແມ່ນ (ຈຳນວນເຕັມ)'}</td>
-          <td><button class="btn sm danger" onclick="deleteUnit('${esc(u.UnitID)}')">ລົບ</button></td>
-        </tr>
-      `).join('')}
-    </table>
-  ` : '<div class="empty">ຍັງບໍ່ມີການຕັ້ງຄ່າໜ່ວຍນັບ</div>';
-}
-
-function unitForm() {
-  const html = `
-    <form onsubmit="saveUnit(event)">
-      <label class="f">ຊື່ໜ່ວຍນັບ <input id="uName" placeholder="ເຊັ່ນ: ກິໂລກຣາມ, ແພັກ, ຊິ້ນ" required></label>
-      <label class="f mt" style="display:flex;align-items:center;gap:8px">
-        <input type="checkbox" id="uWeight" style="width:auto;margin:0">
-        ອະນຸຍາດໃຫ້ປ້ອນເປັນທົດສະນິຍົມໄດ້ (ສຳລັບສິນຄ້າຊັ່ງນ້ຳໜັກ)
-      </label>
-      <div class="row mt" style="justify-content:flex-end">
-        <button type="button" class="btn" onclick="closeModal()">ຍົກເລີກ</button>
-        <button type="submit" class="btn pri">ບັນທຶກໜ່ວຍນັບ</button>
-      </div>
-    </form>
-  `;
-  openModal('ເພີ່ມໜ່ວຍນັບໃໝ່', html);
-}
-
-async function saveUnit(e) {
-  e.preventDefault();
-  const data = {
-    UnitName: $('#uName').value.trim(),
-    IsWeight: $('#uWeight').checked
-  };
-
-  await run(async () => {
-    await api('addUnit', data);
-    toast('ເພີ່ມໜ່ວຍນັບຮຽບຮ້ອຍແລ້ວ');
-    closeModal();
-    refreshBase().then(renderUnits);
-  });
-}
-
-async function deleteUnit(id) {
-  if (!confirm('ຢືນຢັນການລົບໜ່ວຍນັບນີ້?')) return;
-  await run(async () => {
-    await api('deleteUnit', id);
-    toast('ລົບໜ່ວຍນັບຮຽບຮ້ອຍແລ້ວ');
-    refreshBase().then(renderUnits);
-  });
-}
-
-async function runDebug() {
-  const out = $('#dbgOut');
-  if(!out) return;
-  out.textContent = 'ກຳລັງກວດສອບລະບົບການເຊື່ອມຕໍ່...';
-  try {
-    const res = await api('debugSystem');
-    out.textContent = JSON.stringify(res, null, 2);
-  } catch(e) {
-    out.textContent = 'ເກີດຂໍ້ຜິດພາດ: ' + e.message;
-  }
-}
-
-/* ======================= INIT ======================= */
-window.addEventListener('DOMContentLoaded', () => {
-  refreshBase();
-});
+/* ======================= START ======================= */
+if(!(store.get('pos_api_token') || DEFAULT_API_TOKEN)) { go('settings'); toast('ກະລຸນາໃສ່ລະຫັດ API ເພື່ອເລີ່ມໃຊ້ງານ'); }
+else { go(store.get('pos_view') || 'dash'); applyBrand(); }
 </script>
-
 </body>
 </html>
