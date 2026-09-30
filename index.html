@@ -867,45 +867,60 @@ async function showInvoice(no){
   if(!r) return;
   S.settings = st;
   const inv = r.invoice;
-  $('#mBody').innerHTML = `<div id="receipt">${receiptHtml(inv, r.items, st)}</div>
     <div class="row mt"><span>${statusTag(inv.PaymentStatus)}</span><span class="spacer"></span>
       <button class="btn" onclick="toggleInv('${esc(no)}','${inv.PaymentStatus === 'Paid' ? 'Unpaid' : 'Paid'}')">
         ${inv.PaymentStatus === 'Paid' ? 'ປ່ຽນເປັນຍັງບໍ່ຈ່າຍ' : 'ໝາຍວ່າຈ່າຍແລ້ວ'}</button>
       <button class="btn" onclick="invoiceEditForm('${esc(no)}')">ແກ້ໄຂ</button>
       <button class="btn pri" onclick="printReceipt()">ພິມໃບບິນ</button></div>`;
 }
+function invItems(r){
+  let a = r.items || r.Items || r.lines || r.details || (r.invoice && (r.invoice.items || r.invoice.Items)) || [];
+  if(typeof a === 'string'){ try{ a = JSON.parse(a); }catch(e){ a = []; } }
+  if(!Array.isArray(a)) a = Object.values(a || {});
+  return a.map(i => ({
+    ...i,
+    ProductID: i.ProductID ?? i.productId ?? '',
+    ProductName: i.ProductName ?? i.productName ?? i.name ?? '',
+    Quantity: i.Quantity ?? i.quantity ?? i.qty ?? 0,
+    Unit: i.Unit ?? i.unit ?? '',
+    UnitPrice: i.UnitPrice ?? i.unitPrice ?? i.price ?? 0,
+    LineTotal: i.LineTotal ?? i.lineTotal ?? i.TotalPrice ?? i.total
+  }));
+}
 function receiptHtml(inv, items, st){
   const sig  = String(inv.Signature || '');
   const head = store.get('pos_bill_head');
   const foot = store.get('pos_bill_foot') || 'ຂອບໃຈທີ່ອຸດໜູນ';
   const qtySum = items.reduce((s,i) => s + N(i.Quantity), 0);
-  const cell = 'padding:2px 0;border-bottom:1px dotted #bbb';
-  const rows = items.map((i, k) => `
-    <tr><td colspan="3" style="padding:5px 0 0;border:0"><b>${k + 1}. ${esc(i.ProductName)}</b></td></tr>
-    <tr>
-      <td class="num" style="${cell}">${esc(i.Quantity)} ${esc(i.Unit || unitOf(i.ProductID))}</td>
-      <td class="r num" style="${cell}">@ ${money(i.UnitPrice)}</td>
-      <td class="r num" style="${cell}"><b>${money(i.LineTotal ?? N(i.Quantity) * N(i.UnitPrice))}</b></td>
-    </tr>`).join('');
+  // ຮູບແບບເງິນ: ₭1.560.000 (ຈຸດຂັ້ນຫຼັກພັນ)
+  const kip = n => '₭' + N(n).toLocaleString('de-DE', {maximumFractionDigits:2});
+  const line = '<div style="border-top:1px solid #ddd;margin:10px 0"></div>';
+  const rows = items.map(i => {
+    const unit = esc(i.Unit || unitOf(i.ProductID));
+    const lineTotal = i.LineTotal ?? N(i.Quantity) * N(i.UnitPrice);
+    return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 0">' +
+      '<div><div style="font-size:16px">' + esc(i.ProductName) + '</div>' +
+      '<div style="color:#777;font-size:14px">' + esc(i.Quantity) + (unit ? ' ' + unit : '') + ' x ' + kip(i.UnitPrice) + '</div></div>' +
+      '<div style="font-size:16px;font-weight:600;white-space:nowrap">' + kip(lineTotal) + '</div></div>';
+  }).join('');
   return `<div style="text-align:center"><b style="font-size:18px">${esc(st.ShopName || 'ຮ້ານຂອງຂ້ອຍ')}</b><br>
     <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small>
     ${head ? `<div style="white-space:pre-line;margin-top:6px;font-size:13px">${esc(head)}</div>` : ''}</div>
-    <hr style="border:0;border-top:1px dashed #999">
+    ${line}
     <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ/ເວລາ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
-    <table style="margin-top:8px;width:100%;border-collapse:collapse">
-      <tr><th style="text-align:left">ຈຳນວນ</th><th class="r">ລາຄາຂາຍ/ໜ່ວຍ</th><th class="r">ລວມ</th></tr>
-      ${rows}
-    </table>
-    <div style="border-top:1px dashed #999;margin-top:8px;padding-top:6px;font-size:12px">
-      ທັງໝົດ ${items.length} ລາຍການ · ຈຳນວນລວມ ${qtySum}</div>
+    ${line}
+    ${rows}
+    ${line}
+    <div style="font-size:12px;color:#777">ທັງໝົດ ${items.length} ລາຍການ · ຈຳນວນລວມ ${qtySum}</div>
     <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:6px">
-      <span>ລວມທັງໝົດ</span><span class="num">${money(inv.TotalAmount)}</span></div>
-    <small>ຊຳລະ: ${esc(payLabel(inv.PaymentMethod))}${inv.PaymentMethod === 'Cash+Transfer' ? ` (ສົດ ${money(inv.CashAmount)} / ໂອນ ${money(inv.TransferAmount)})` : ''}
+      <span>ລວມທັງໝົດ</span><span>${kip(inv.TotalAmount)}</span></div>
+    <small>ຊຳລະ: ${esc(payLabel(inv.PaymentMethod))}${inv.PaymentMethod === 'Cash+Transfer' ? ` (ສົດ ${kip(inv.CashAmount)} / ໂອນ ${kip(inv.TransferAmount)})` : ''}
       · ${inv.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ'}${inv.Note ? '<br>ໝາຍເຫດ: ' + esc(inv.Note) : ''}</small>
     ${sig.startsWith('data:image') ? `<div style="text-align:center;margin-top:10px"><img src="${esc(sig)}" style="width:180px" alt="ລາຍເຊັນ"><br><small>ລາຍເຊັນລູກຄ້າ</small></div>` : ''}
     ${st.QRCodeURL && inv.PaymentStatus !== 'Paid' ? `<div style="text-align:center;margin-top:10px"><img src="${esc(st.QRCodeURL)}" style="width:160px" alt="QR"><br><small>ສະແກນເພື່ອໂອນ</small></div>` : ''}
-    <hr style="border:0;border-top:1px dashed #999">
+    ${line}
     <div style="text-align:center;white-space:pre-line;font-size:13px">${esc(foot)}</div>`;
+}
 }
 function printReceipt(){
   const w = window.open('', '_blank', 'width=420,height=640'); if(!w) return toast('ບຣາວເຊີບລັອກໜ້າຕ່າງພິມ — ກະລຸນາອະນຸຍາດ pop-up', true);
@@ -1194,6 +1209,193 @@ async function applyBrand(){
 /* ======================= START ======================= */
 if(!(store.get('pos_api_token') || DEFAULT_API_TOKEN)) { go('settings'); toast('ກະລຸນາໃສ່ລະຫັດ API ເພື່ອເລີ່ມໃຊ້ງານ'); }
 else { go(store.get('pos_view') || 'dash'); applyBrand(); }
+</script>
+<!-- ==========================================
+     POS UI/UX ENHANCEMENTS & SOUND EFFECTS 
+     ========================================== -->
+
+<!-- 1. Container ສຳລັບສະແດງ Toast Notification -->
+<div id="toast-container"></div>
+
+<!-- 2. CSS Style ຕົບແຕ່ງ UI ແລະ Animations -->
+<style>
+/* --- ຮູບແບບ Card & Shadows ທັນສະໄໝ --- */
+.pos-card, .card {
+  border-radius: 16px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+  transition: all 0.3s ease !important;
+  border: 1px solid rgba(0, 0, 0, 0.05) !important;
+}
+
+.pos-card:hover, .card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* --- ເອັບເຟັກປຸ່ມ (Hover & Active) --- */
+button, .btn {
+  border-radius: 10px !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.2s ease !important;
+}
+
+button:hover, .btn:hover {
+  transform: scale(1.02);
+  filter: brightness(1.05);
+}
+
+button:active, .btn:active {
+  transform: scale(0.96);
+}
+
+/* --- Toast Notification (ປ້າຍແຈ້ງເຕືອນ) --- */
+#toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 99999;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 280px;
+  padding: 14px 20px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  color: #ffffff;
+  font-weight: 600;
+  font-family: 'Phetsarath OT', 'Noto Sans Lao', sans-serif;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  animation: slideIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), fadeOut 0.5s ease 2.5s forwards;
+}
+
+.toast.success { 
+  background: linear-gradient(135deg, #10b981, #059669); 
+}
+
+.toast.error { 
+  background: linear-gradient(135deg, #ef4444, #dc2626); 
+}
+
+@keyframes slideIn {
+  from { transform: translateX(120%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-20px); }
+}
+</style>
+
+<!-- 3. JavaScript ລະບົບສຽງ ແລະ ການເຮັດວຽກ -->
+<script>
+// --- Audio Context ສຳລັບສ້າງສຽງເອັບເຟັກອັດໂນມັດ (ບໍ່ຕ້ອງໃຊ້ໄຟລ໌ MP3) ---
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+// 1. ສຽງກົດປຸ່ມທົ່ວໄປ (Click Sound)
+function playClickSound() {
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(400, audioCtx.currentTime + 0.05);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.05);
+  } catch (e) { console.log(e); }
+}
+
+// 2. ສຽງຍິງບາໂຄດ / ເລືອກສິນຄ້າ (Beep Sound)
+function playBeepSound() {
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.08);
+  } catch (e) { console.log(e); }
+}
+
+// 3. ສຽງຊຳລະເງິນ / ບັນທຶກສຳເລັດ (Success Cash Chime)
+function playSuccessSound() {
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+    notes.forEach((freq, index) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.08);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime + index * 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + index * 0.08 + 0.2);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(audioCtx.currentTime + index * 0.08);
+      osc.stop(audioCtx.currentTime + index * 0.08 + 0.2);
+    });
+  } catch (e) { console.log(e); }
+}
+
+// 4. ສຽງແຈ້ງເຕືອນຜິດພາດ (Error Sound)
+function playErrorSound() {
+  try {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+    osc.frequency.setValueAtTime(110, audioCtx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.25);
+  } catch (e) { console.log(e); }
+}
+
+// --- ຟັງຊັນສະແດງ Toast ແຈ້ງເຕືອນ + ສຽງ (ໃຊ້ຮ້ອງໃນໂຄດຂອງທ່ານໄດ້) ---
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  
+  if (type === 'success') {
+    toast.innerHTML = `<span>✅ ${message}</span>`;
+    playSuccessSound();
+  } else {
+    toast.innerHTML = `<span>⚠️ ${message}</span>`;
+    playErrorSound();
+  }
+  
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+// --- ເພີ່ມ Event Listener ສຽງກົດໃຫ້ທຸກໆ ປຸ່ມໃນໜ້າ ເມື່ອໂຫຼດເດັດສຳເລັດ ---
+document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('click', (e) => {
+    // ຖ້າກົດຖືກ ປຸ່ມ ຫຼື element ທີ່ມີ class ທີ່ກ່ຽວຂ້ອງ
+    if (e.target.closest('button, .btn, input[type="button"], input[type="submit"]')) {
+      playClickSound();
+    }
+  });
+});
 </script>
 </body>
 </html>
