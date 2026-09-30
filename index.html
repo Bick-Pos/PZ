@@ -122,19 +122,16 @@ textarea{min-height:70px;resize:vertical}
 
 /* ---------- mobile ---------- */
 @media (max-width:860px){
-  .app{grid-template-columns:66px 1fr}
-  nav.side{position:sticky;top:0;height:100vh;height:100dvh;width:66px;z-index:40;display:flex;flex-direction:column;
-    overflow-y:auto;overflow-x:hidden;padding:8px 4px;gap:4px}
+  .app{grid-template-columns:1fr}
+  nav.side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;z-index:40;display:flex;overflow-x:auto;
+    padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:2px}
   .brand{display:none}
-  nav.side button{flex-direction:column;gap:2px;font-size:10px;line-height:1.2;padding:10px 2px;width:100%;min-width:0;
-    align-items:center;justify-content:center;text-align:center}
-  nav.side .ico{font-size:20px;width:auto}
-  .g2{grid-template-columns:1fr}
+  nav.side button{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;min-width:64px;align-items:center;text-align:center}
+  nav.side .ico{font-size:18px}
   .pos{grid-template-columns:1fr}
   .ticket{position:static;order:-1;margin-bottom:6px}
   .ticket .lines{max-height:34vh}
-  main{padding:16px 10px 40px}
-  #toast{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+  main{padding-bottom:110px}
 }
 </style>
 </head>
@@ -870,12 +867,25 @@ async function showInvoice(no){
   if(!r) return;
   S.settings = st;
   const inv = r.invoice;
-  $('#mBody').innerHTML = `<div id="receipt">${receiptHtml(inv, r.items, st)}</div>
     <div class="row mt"><span>${statusTag(inv.PaymentStatus)}</span><span class="spacer"></span>
       <button class="btn" onclick="toggleInv('${esc(no)}','${inv.PaymentStatus === 'Paid' ? 'Unpaid' : 'Paid'}')">
         ${inv.PaymentStatus === 'Paid' ? 'ປ່ຽນເປັນຍັງບໍ່ຈ່າຍ' : 'ໝາຍວ່າຈ່າຍແລ້ວ'}</button>
       <button class="btn" onclick="invoiceEditForm('${esc(no)}')">ແກ້ໄຂ</button>
       <button class="btn pri" onclick="printReceipt()">ພິມໃບບິນ</button></div>`;
+}
+function invItems(r){
+  let a = r.items || r.Items || r.lines || r.details || (r.invoice && (r.invoice.items || r.invoice.Items)) || [];
+  if(typeof a === 'string'){ try{ a = JSON.parse(a); }catch(e){ a = []; } }
+  if(!Array.isArray(a)) a = Object.values(a || {});
+  return a.map(i => ({
+    ...i,
+    ProductID: i.ProductID ?? i.productId ?? '',
+    ProductName: i.ProductName ?? i.productName ?? i.name ?? '',
+    Quantity: i.Quantity ?? i.quantity ?? i.qty ?? 0,
+    Unit: i.Unit ?? i.unit ?? '',
+    UnitPrice: i.UnitPrice ?? i.unitPrice ?? i.price ?? 0,
+    LineTotal: i.LineTotal ?? i.lineTotal ?? i.TotalPrice ?? i.total
+  }));
 }
 function receiptHtml(inv, items, st){
   const sig  = String(inv.Signature || '');
@@ -910,6 +920,7 @@ function receiptHtml(inv, items, st){
     ${st.QRCodeURL && inv.PaymentStatus !== 'Paid' ? `<div style="text-align:center;margin-top:10px"><img src="${esc(st.QRCodeURL)}" style="width:160px" alt="QR"><br><small>ສະແກນເພື່ອໂອນ</small></div>` : ''}
     ${line}
     <div style="text-align:center;white-space:pre-line;font-size:13px">${esc(foot)}</div>`;
+}
 }
 function printReceipt(){
   const w = window.open('', '_blank', 'width=420,height=640'); if(!w) return toast('ບຣາວເຊີບລັອກໜ້າຕ່າງພິມ — ກະລຸນາອະນຸຍາດ pop-up', true);
