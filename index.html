@@ -122,16 +122,19 @@ textarea{min-height:70px;resize:vertical}
 
 /* ---------- mobile ---------- */
 @media (max-width:860px){
-  .app{grid-template-columns:1fr}
-  nav.side{position:fixed;top:auto;bottom:0;left:0;right:0;height:auto;z-index:40;display:flex;overflow-x:auto;
-    padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));gap:2px}
+  .app{grid-template-columns:66px 1fr}
+  nav.side{position:sticky;top:0;height:100vh;height:100dvh;width:66px;z-index:40;display:flex;flex-direction:column;
+    overflow-y:auto;overflow-x:hidden;padding:8px 4px;gap:4px}
   .brand{display:none}
-  nav.side button{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;min-width:64px;align-items:center;text-align:center}
-  nav.side .ico{font-size:18px}
+  nav.side button{flex-direction:column;gap:2px;font-size:10px;line-height:1.2;padding:10px 2px;width:100%;min-width:0;
+    align-items:center;justify-content:center;text-align:center}
+  nav.side .ico{font-size:20px;width:auto}
+  .g2{grid-template-columns:1fr}
   .pos{grid-template-columns:1fr}
   .ticket{position:static;order:-1;margin-bottom:6px}
   .ticket .lines{max-height:34vh}
-  main{padding-bottom:110px}
+  main{padding:16px 10px 40px}
+  #toast{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 }
 </style>
 </head>
