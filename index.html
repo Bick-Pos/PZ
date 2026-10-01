@@ -1339,7 +1339,6 @@ async function loadSettings(){
   $('#sQrPrev').dataset.url = st.QRCodeURL || '';
   renderUnits();
 }
-async function saveConn(){
 async function saveShop(){
   store.set('pos_rc_head', $('#sHead').value.trim()); store.set('pos_rc_foot', $('#sFoot').value.trim());
   const p = { shopName:$('#sName').value, shopPhone:$('#sPhone').value, shopAddress:$('#sAddr').value, qrCodeUrl:$('#sQrPrev').dataset.url || '' };
