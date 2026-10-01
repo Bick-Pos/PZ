@@ -63,6 +63,8 @@ tr.click{cursor:pointer}tr.click:hover td{background:#F4F8F6}
 .btn.pri:hover{filter:brightness(1.08)}
 .btn.gold{background:var(--gold);border-color:var(--gold);color:#fff}
 .btn.danger{color:var(--red);border-color:#E7B8BB}
+.btn.danger:hover{border-color:var(--red)}
+.btn.danger.solid{background:var(--red);border-color:var(--red);color:#fff}
 .btn.sm{padding:4px 10px;font-size:13px}
 .btn:disabled{opacity:.5;cursor:wait}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
@@ -1062,10 +1064,11 @@ function renderInvoices(){
   const list = filteredInvoices();
   const sum = list.reduce((s,i) => s + (Number(i.TotalAmount)||0), 0);
   const unpaid = list.filter(i => i.PaymentStatus === 'Unpaid').reduce((s,i) => s + (Number(i.TotalAmount)||0), 0);
-  $('#invTable').innerHTML = list.length ? `<table><tr><th>ເລກບິນ</th><th>ວັນທີ</th><th>ລູກຄ້າ</th><th>ຊຳລະ</th><th class="r">ຍອດ</th><th>ສະຖານະ</th></tr>
+  $('#invTable').innerHTML = list.length ? `<table><tr><th>ເລກບິນ</th><th>ວັນທີ</th><th>ລູກຄ້າ</th><th>ຊຳລະ</th><th class="r">ຍອດ</th><th>ສະຖານະ</th><th></th></tr>
     ${list.map(i => `<tr class="click" onclick="showInvoice('${esc(i.InvoiceNo)}')"><td class="num">${esc(i.InvoiceNo)}</td><td>${fmtDate(i.Date)}</td>
       <td>${esc(i.CustomerName || '-')}${i.Phone ? '<br><small>' + esc(i.Phone) + '</small>' : ''}</td><td>${esc(payLabel(i.PaymentMethod))}</td>
-      <td class="r num">${money(i.TotalAmount)}</td><td>${statusTag(i.PaymentStatus)}</td></tr>`).join('')}</table>
+      <td class="r num">${money(i.TotalAmount)}</td><td>${statusTag(i.PaymentStatus)}</td>
+      <td class="r"><button class="btn sm danger" onclick="event.stopPropagation();deleteInvoiceForm('${esc(i.InvoiceNo)}')" aria-label="ລົບບິນ">🗑️ ລົບ</button></td></tr>`).join('')}</table>
     <div style="margin-top:10px;font-size:13px;color:var(--muted)" class="num">${list.length} ໃບ · ລວມ ${money(sum)} · ຍັງບໍ່ຈ່າຍ ${money(unpaid)}</div>`
     : '<div class="empty">ບໍ່ມີໃບບິນໃນລາຍການນີ້</div>';
 }
@@ -1073,6 +1076,31 @@ function exportInvoices(){
   downloadCSV('invoices.csv', [['ເລກບິນ','ວັນທີ','ລູກຄ້າ','ເບີໂທ','ຍອດ','ວິທີຊຳລະ','ເງິນສົດ','ເງິນໂອນ','ສະຖານະ','ໝາຍເຫດ']]
     .concat(filteredInvoices().map(i => [i.InvoiceNo, fmtDate(i.Date), i.CustomerName, i.Phone, i.TotalAmount, payLabel(i.PaymentMethod),
       i.CashAmount ?? '', i.TransferAmount ?? '', i.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ', i.Note])));
+}
+
+// ລົບໃບບິນ: ລົບແຖວອອກຈາກ Sheet (Invoices + InvoiceItems) ແລະ ເລືອກໄດ້ວ່າຈະຄືນສະຕັອກບໍ່
+function deleteInvoiceForm(no){
+  const inv = INV.find(x => x.InvoiceNo === no) || {};
+  openModal('ລົບໃບບິນ', `
+    <p style="margin-top:0">ແນ່ໃຈບໍ່ວ່າຈະລົບບິນ <b class="num">${esc(no)}</b>${inv.TotalAmount !== undefined ? ' ຍອດ <b class="num">' + money(inv.TotalAmount) + '</b>' : ''}?<br>
+      <span style="color:var(--red);font-size:13px">ລົບແລ້ວຈະກູ້ຄືນບໍ່ໄດ້.</span></p>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:16px;cursor:pointer">
+      <input type="checkbox" id="delRestore" checked style="margin-top:5px">
+      <span>ຄືນສະຕັອກສິນຄ້າໃນບິນນີ້ເຂົ້າຄັງ<br><small style="color:var(--muted)">ເອົາຕິກອອກ ຖ້າບໍ່ຕ້ອງການປັບສະຕັອກ</small></span>
+    </label>
+    <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button>
+      <button class="btn danger solid" id="delGo">ລົບບິນ</button></div>`);
+  $('#delGo').onclick = async () => {
+    const restore = $('#delRestore').checked;
+    $('#delGo').disabled = true;
+    const ok = await run(() => api('deleteInvoice', no, restore), 'ລົບບິນແລ້ວ');
+    if(!ok){ $('#delGo').disabled = false; return; }
+    closeModal();
+    INV = INV.filter(x => x.InvoiceNo !== no);   // ເອົາອອກຈາກຕາຕະລາງທັນທີ
+    if(CUR === 'invoices') renderInvoices();
+    aiCtx = null;                                 // ໃຫ້ AI ໂຫຼດຂໍ້ມູນໃໝ່
+    if(CUR === 'invoices') loadInvoices().catch(() => {});
+  };
 }
 
 async function showInvoice(no){
@@ -1086,6 +1114,7 @@ async function showInvoice(no){
       <button class="btn" onclick="toggleInv('${esc(no)}','${inv.PaymentStatus === 'Paid' ? 'Unpaid' : 'Paid'}')">
         ${inv.PaymentStatus === 'Paid' ? 'ປ່ຽນເປັນຍັງບໍ່ຈ່າຍ' : 'ໝາຍວ່າຈ່າຍແລ້ວ'}</button>
       <button class="btn" onclick="invoiceEditForm('${esc(no)}')">ແກ້ໄຂ</button>
+      <button class="btn danger" onclick="deleteInvoiceForm('${esc(no)}')">ລົບບິນ</button>
       <button class="btn pri" onclick="printReceipt()">ພິມໃບບິນ</button></div>`;
 }
 function receiptHtml(inv, items, st){
