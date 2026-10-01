@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ລະບົບຫຼັງຮ້ານ POS</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A7%BE%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao+Looped:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -105,6 +105,34 @@ textarea{min-height:70px;resize:vertical}
 .ticket .total{display:flex;justify-content:space-between;font-size:22px;font-weight:700;padding:12px 0;border-top:2px dashed var(--line);margin-top:8px}
 .ticket .lines{max-height:40vh;overflow:auto}
 
+/* ---------- open tickets strip ---------- */
+.ot-strip{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 12px;margin-bottom:6px;-webkit-overflow-scrolling:touch}
+.ot-chip{flex:0 0 auto;min-width:150px;max-width:220px;background:var(--paper);border:1px solid var(--line);
+  border-radius:var(--radius);padding:8px 10px;cursor:pointer;text-align:left;position:relative}
+.ot-chip:hover{border-color:var(--jade)}
+.ot-chip.active{border-color:var(--jade);background:var(--jade-soft);box-shadow:0 0 0 1px var(--jade) inset}
+.ot-chip .n{font-weight:600;font-size:14px;padding-right:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ot-chip .s{font-size:12px;color:var(--muted)}
+.ot-chip .t{color:var(--jade);font-weight:700;font-size:14px}
+.ot-chip .d{position:absolute;top:4px;right:6px;background:none;border:0;color:var(--red);font-size:18px;cursor:pointer;line-height:1}
+.ot-day{display:flex;justify-content:space-between;align-items:center;margin:14px 0 6px;padding:6px 10px;background:var(--gold-soft);border-radius:8px;font-size:14px}
+.ot-day:first-child{margin-top:0}
+.ot-chip .dt{font-size:11px;color:var(--gold);font-weight:600}
+.ot-chip.new{border-style:dashed;color:var(--jade);font-weight:600;min-width:90px;display:grid;place-items:center}
+
+/* ---------- AI ASSISTANT ---------- */
+.chatbox{display:flex;flex-direction:column;height:calc(100vh - 230px);min-height:420px}
+.chat-log{flex:1;overflow-y:auto;padding:6px 2px;display:flex;flex-direction:column;gap:10px}
+.bubble{max-width:78%;padding:10px 14px;border-radius:14px;font-size:14px;line-height:1.55;white-space:pre-wrap}
+.bubble.user{align-self:flex-end;background:var(--jade);color:#fff;border-bottom-right-radius:4px}
+.bubble.ai{align-self:flex-start;background:#F6F8F7;border:1px solid var(--line);border-bottom-left-radius:4px}
+.chat-suggest{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chat-suggest button{font-size:12.5px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);
+  background:var(--jade-soft);color:var(--jade);cursor:pointer}
+.chat-suggest button:hover{filter:brightness(.97)}
+.chat-input{display:flex;gap:8px;margin-top:10px}
+.chat-input textarea{flex:1;resize:none;min-height:44px;max-height:140px}
+
 /* ---------- modal & toast ---------- */
 .modal-bg{position:fixed;inset:0;background:rgba(20,30,26,.5);display:none;align-items:flex-start;justify-content:center;
   padding:max(24px,env(safe-area-inset-top,0px)) 12px 24px;z-index:50;overflow:auto}
@@ -129,8 +157,9 @@ textarea{min-height:70px;resize:vertical}
   nav.side button{flex-direction:column;gap:0;font-size:11px;padding:6px 10px;min-width:64px;align-items:center;text-align:center}
   nav.side .ico{font-size:18px}
   .pos{grid-template-columns:1fr}
-  .ticket{position:static;order:-1;margin-bottom:6px}
-  .ticket .lines{max-height:34vh}
+  .ticket{position:static;order:-1}      /* ບິນໃໝ່ຂຶ້ນເທິງສຸດໃນມືຖື */
+  .ticket .lines{max-height:26vh}        /* ລາຍການໃນບິນເລື່ອນໄດ້ ບໍ່ດັນຊ່ອງຄົ້ນຫາລົງໄກ */
+  .chatbox{height:calc(100vh - 250px)}
   main{padding-bottom:110px}
 }
 </style>
@@ -141,6 +170,7 @@ textarea{min-height:70px;resize:vertical}
   <nav class="side" id="nav">
     <div class="brand" id="brandName">ລະບົບຫຼັງຮ້ານ<small id="brandSub">POS Back-office</small></div>
     <button data-v="dash"><span class="ico">📊</span>ພາບລວມ</button>
+    <button data-v="ai"><span class="ico">🤖</span>ຜູ້ຊ່ວຍ AI</button>
     <button data-v="pos"><span class="ico">🧾</span>ຂາຍສິນຄ້າ</button>
     <button data-v="products"><span class="ico">📦</span>ສິນຄ້າ</button>
     <button data-v="stock"><span class="ico">🔁</span>ເຂົ້າ-ອອກສະຕັອກ</button>
@@ -157,8 +187,31 @@ textarea{min-height:70px;resize:vertical}
       <div id="dashBody"><div class="empty">ກຳລັງໂຫຼດ...</div></div>
     </section>
 
+    <!-- AI ASSISTANT -->
+    <section class="view" id="v-ai">
+      <div class="row"><h1>ຜູ້ຊ່ວຍ AI</h1><span class="spacer"></span>
+        <button class="btn sm" onclick="setAiKey()">🔑 ຕັ້ງ Gemini Key</button>
+        <button class="btn sm" onclick="aiHistory=[];renderAi()">ລ້າງແຊັດ</button></div>
+      <div class="panel chatbox">
+        <div class="chat-log" id="aiLog"></div>
+        <div class="chat-suggest" id="aiSuggest">
+          <button onclick="askAiQuick('ຍອດຂາຍມື້ນີ້ ແລະ ອາທິດນີ້ເປັນແນວໃດ?')">ຍອດຂາຍມື້ນີ້</button>
+          <button onclick="askAiQuick('ສິນຄ້າໃດຂາຍດີທີ່ສຸດເດືອນນີ້?')">ສິນຄ້າຂາຍດີ</button>
+          <button onclick="askAiQuick('ສິນຄ້າໃດໃກ້ໝົດ ຄວນສັ່ງຊື້ຕື່ມ?')">ສິນຄ້າໃກ້ໝົດ</button>
+          <button onclick="askAiQuick('ໃຜຄ້າງໜີ້ຫຼາຍທີ່ສຸດ?')">ໜີ້ຄ້າງ</button>
+          <button onclick="askAiQuick('ອາທິດນີ້ທຽບກັບອາທິດແລ້ວ ຂາຍດີຂຶ້ນ ຫຼື ຫຼຸດລົງ?')">ທຽບອາທິດແລ້ວ</button>
+        </div>
+        <div class="chat-input">
+          <textarea id="aiInput" placeholder="ຖາມກ່ຽວກັບຮ້ານ ເຊັ່ນ: ອາທິດນີ້ຂາຍໄດ້ເທົ່າໃດ?"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAi()}"></textarea>
+          <button class="btn pri" id="aiSend" onclick="sendAi()">ສົ່ງ</button>
+        </div>
+      </div>
+    </section>
+
     <!-- POS -->
     <section class="view" id="v-pos">
+      <div class="ot-strip" id="otStrip"></div>
       <div class="pos">
         <div>
           <div class="row" style="margin-bottom:14px">
@@ -245,11 +298,9 @@ textarea{min-height:70px;resize:vertical}
           <label class="f">ຊື່ຮ້ານ<input id="sName"></label>
           <label class="f">ເບີໂທ<input id="sPhone"></label>
           <label class="f">ທີ່ຢູ່<input id="sAddr"></label>
-          <label class="f">ຂໍ້ຄວາມຫົວບິນ (ເຊັ່ນ ເລກບັນຊີ, ເວລາເປີດ-ປິດ)<textarea id="sHead"></textarea></label>
-          <label class="f">ຂໍ້ຄວາມທ້າຍບິນ (ຫວ່າງ = ຂອບໃຈທີ່ອຸດໜູນ)<textarea id="sFoot"></textarea></label>
           <label class="f">ຮູບ QR ຮັບເງິນໂອນ<input type="file" id="sQrFile" accept="image/*"></label>
           <div id="sQrPrev"></div>
-          <label class="f">Gemini API Key (ສຳລັບອ່ານຮູບໃບໜີ້ດ້ວຍ AI) <span id="sKeyState"></span>
+          <label class="f">Gemini API Key (ສຳລັບອ່ານຮູບໃບໜີ້ດ້ວຍ AI ແລະ ຜູ້ຊ່ວຍ AI) <span id="sKeyState"></span>
             <input id="sKey" type="password" placeholder="ປ່ອຍຫວ່າງ = ບໍ່ປ່ຽນ"></label>
           <button class="btn pri" onclick="saveShop()">ບັນທຶກຂໍ້ມູນຮ້ານ</button>
         </div>
@@ -287,21 +338,13 @@ let pending = 0;
 function busy(d){ pending += d; const l = document.getElementById('loader'); l.style.width = pending > 0 ? '70%' : '0'; }
 
 async function api(fn, ...args){
-  const url = store.get('pos_api_url') || DEFAULT_API_URL, token = store.get('pos_api_token') || DEFAULT_API_TOKEN;
+  const url = (store.get('pos_api_url') || DEFAULT_API_URL), token = (store.get('pos_api_token') || DEFAULT_API_TOKEN);
   if(!url){ go('settings'); throw new Error('ກະລຸນາຕັ້ງຄ່າ URL ຂອງ Web App ກ່ອນ'); }
   busy(1);
   try{
     const res = await fetch(url, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify({ token, fn, args }) });
-    const txt = await res.text();
-    let j;
-    try{ j = JSON.parse(txt); }
-    catch(e){
-      const m = txt.match(/<title>([^<]*)<\/title>/i);
-      const t = (m ? m[1] : txt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 120);
-      console.error('Apps Script ສົ່ງ HTML ກັບມາ (' + fn + '):', txt.slice(0, 1000));
-      throw new Error('Apps Script ຕອບເປັນ HTML ບໍ່ແມ່ນ JSON [' + fn + ']: ' + t);
-    }
+    const j = await res.json();
     if(!j.ok) throw new Error(j.error || 'ເກີດຂໍ້ຜິດພາດ');
     return j.data;
   }catch(e){
@@ -313,17 +356,13 @@ async function api(fn, ...args){
 /* ======================= HELPERS ======================= */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const N = v => Number(v) || 0;
-const money = n => N(n).toLocaleString('en-US', {maximumFractionDigits:2}) + ' ₭';
+const money = n => (Number(n)||0).toLocaleString('en-US', {maximumFractionDigits:2}) + ' ₭';
 const fmtDate = d => { if(!d) return ''; const x = new Date(d); return isNaN(x) ? esc(d) : x.toLocaleDateString('en-GB') + ' ' + x.toTimeString().slice(0,5); };
 const fmtDay = d => { if(!d) return ''; const x = new Date(d); return isNaN(x) ? esc(d) : x.toLocaleDateString('en-GB'); };
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
 const pad2 = n => String(n).padStart(2, '0');
 const ymd = d => { const x = new Date(d); return isNaN(x) ? '' : x.getFullYear() + '-' + pad2(x.getMonth()+1) + '-' + pad2(x.getDate()); };
 const inRange = (d, from, to) => { const y = ymd(d); return (!from || y >= from) && (!to || y <= to); };
-// ປັບຕົວອັກສອນລາວ (ຫນ→ໜ, ຫມ→ໝ) ເພື່ອຄົ້ນຫາໃຫ້ເຈິ
-const norm = s => String(s ?? '').normalize('NFC').toLowerCase()
-  .replace(/\u0EAB\u0E99/g, '\u0EDC').replace(/\u0EAB\u0EA1/g, '\u0EDD').replace(/[\u200B-\u200D\uFEFF\s]+/g, ' ').trim();
 function downloadCSV(name, rows){
   const csv = '\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }));
@@ -361,9 +400,8 @@ function fileToBase64(file, maxDim = 1600){
 /* ======================= STATE / NAV ======================= */
 let S = { products:[], units:[], customers:[], settings:{} };
 const unitIsWeight = name => { const u = S.units.find(x => x.UnitName === name); return !!u && (u.IsWeight === true || String(u.IsWeight).toLowerCase() === 'true'); };
-const unitOf = pid => { const p = S.products.find(x => String(x.ProductID) === String(pid)); return p ? (p.Unit || '') : ''; };
 
-const loaders = { dash:loadDash, pos:loadPos, products:loadProducts, stock:loadStock, invoices:loadInvoices,
+const loaders = { dash:loadDash, ai:loadAI, pos:loadPos, products:loadProducts, stock:loadStock, invoices:loadInvoices,
   customers:loadCustomers, debts:loadDebts, settings:loadSettings };
 let CUR = 'dash';
 function reloadActive(){ loaders[CUR] && loaders[CUR]().catch(e => toast(e.message, true)); }
@@ -380,6 +418,148 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => go(b.dat
 async function refreshBase(){
   const [p, u, c] = await Promise.all([api('getProducts'), api('getUnits'), api('getCustomers')]);
   S.products = p; S.units = u; S.customers = c;
+}
+
+/* ======================= AI ASSISTANT ======================= */
+// ໜ້ານີ້ເອີ້ນ Gemini ໂດຍກົງຈາກ browser ແລະ ໃຊ້ຟັງຊັນຂໍ້ມູນເກົ່າຂອງເຈົ້າ (ບໍ່ຕ້ອງແກ້ Api.gs)
+const AI_MODEL = 'gemini-3-flash-preview';   // ຖ້າ error "model not found" ໃຫ້ປ່ຽນຊື່ນີ້
+let aiHistory = [], aiCtx = null, aiCtxAt = 0;
+function loadAI(){ renderAi(); setTimeout(() => $('#aiInput') && $('#aiInput').focus(), 50); }
+function setAiKey(){
+  const k = prompt('ໃສ່ Gemini API Key (ເກັບໄວ້ໃນເຄື່ອງນີ້ເທົ່ານັ້ນ)', store.get('pos_gemini_key'));
+  if(k !== null){ store.set('pos_gemini_key', k.trim()); toast(k.trim() ? 'ບັນທຶກ Key ແລ້ວ' : 'ລຶບ Key ແລ້ວ'); }
+}
+function renderAi(){
+  const log = $('#aiLog');
+  log.innerHTML = aiHistory.length ? aiHistory.map(m => `<div class="bubble ${m.role}">${esc(m.text)}</div>`).join('')
+    : '<div class="empty">ຖາມຫຍັງກ່ຽວກັບຮ້ານກໍໄດ້ — ຍອດຂາຍ, ສະຕັອກ, ລູກຄ້າ, ໜີ້ ... ຫຼືກົດຄຳຖາມແນະນຳຂ້າງລຸ່ມ</div>';
+  log.scrollTop = log.scrollHeight;
+}
+function askAiQuick(q){ $('#aiInput').value = q; sendAi(); }
+
+const daysSince = d => {
+  const t = new Date(ymd(d) + 'T00:00:00').getTime();
+  return isNaN(t) ? null : Math.max(0, Math.round((new Date(today() + 'T00:00:00').getTime() - t) / 864e5));
+};
+
+async function buildAiContext(q){
+  const g = (fn, ...a) => api(fn, ...a).catch(() => null);
+  const byDate = (x, y) => new Date(y.Date) - new Date(x.Date);
+  if(!aiCtx || Date.now() - aiCtxAt > 30000){
+    const [dash, top, customers, invoices, tx, products, b1, b2, b3] = await Promise.all([
+      g('getDashboardData'), g('getTopSellingProducts','monthly',10), g('getCustomers'),
+      g('getInvoices'), g('getTransactions'), g('getProducts'),
+      g('getDebtRecords'), g('debt2_getRecords'), g('debt3_getRecords')]);
+
+    // ---- ທຽບອາທິດ ----
+    const now = Date.now(), d7 = now - 7*864e5, d14 = now - 14*864e5;
+    let a = 0, b = 0, ac = 0, bc = 0;
+    (invoices || []).forEach(i => { const t = new Date(i.Date).getTime(); if(isNaN(t)) return; const m = Number(i.TotalAmount)||0;
+      if(t >= d7 && t <= now){ a += m; ac++; } else if(t >= d14 && t < d7){ b += m; bc++; } });
+
+    // ---- ສິນຄ້າ ແລະ ສະຕັອກ (ທຸກລາຍການ) ----
+    const prods = products || S.products || [];
+    const plist = prods.map(p => {
+      const st = Number(p.CurrentStock)||0, mn = Number(p.MinStock)||0;
+      return { ຊື່:p.ProductName, SKU:p.SKU, ປະເພດ:p.Category, ຄົງເຫຼືອ:st, ໜ່ວຍ:p.Unit, ຂັ້ນຕ່ຳ:mn,
+        ລາຄາຂາຍ:Number(p.SellingPrice)||0, ສະຖານະ: st <= 0 ? 'ໝົດ' : (st <= mn ? 'ໃກ້ໝົດ' : 'ພໍ') };
+    });
+    const stockValue = prods.reduce((s,p) => s + (Number(p.CostPrice)||0) * (Number(p.CurrentStock)||0), 0);
+
+    // ---- ໜີ້ ຈາກທັງ 3 ປຶ້ມ (ໂຄ້ດຄິດວັນ ແລະ ຍອດເອງ) ----
+    const by = {};
+    let unpaidAll = 0, unpaidCount = 0;
+    [[1,b1],[2,b2],[3,b3]].forEach(([book, arr]) => (arr || []).forEach(d => {
+      if(d.Status === 'Paid') return;
+      const name = String(d.CustomerName || 'ບໍ່ລະບຸຊື່').trim();
+      const days = daysSince(d.DateTaken), total = Number(d.TotalAmount)||0;
+      const c = by[name] || (by[name] = { ຊື່:name, ເບີໂທ:d.Phone || '', ຍອດຄ້າງລວມ:0, ຈຳນວນຄັ້ງທີ່ຄ້າງ:0, ຄ້າງມາດົນສຸດ_ວັນ:0, ລາຍການຄ້າງ:[] });
+      c.ຍອດຄ້າງລວມ += total; c.ຈຳນວນຄັ້ງທີ່ຄ້າງ++;
+      if(days !== null && days > c.ຄ້າງມາດົນສຸດ_ວັນ) c.ຄ້າງມາດົນສຸດ_ວັນ = days;
+      c.ລາຍການຄ້າງ.push({ ປຶ້ມໜີ້:book, ວັນທີເອົາເຄື່ອງ:ymd(d.DateTaken), ຄ້າງມາແລ້ວ_ວັນ:days, ຍອດ:total,
+        ເຄື່ອງທີ່ເອົາໄປ:(d.Items || []).map(i => ({ ຊື່:i.name, ລາຄາ:Number(i.price)||0 })), ໝາຍເຫດ:d.Note || '' });
+      unpaidAll += total; unpaidCount++;
+    }));
+    const debtors = Object.values(by).sort((x, y) => y.ຍອດຄ້າງລວມ - x.ຍອດຄ້າງລວມ);
+    debtors.forEach(c => c.ລາຍການຄ້າງ.sort((x, y) => String(x.ວັນທີເອົາເຄື່ອງ).localeCompare(String(y.ວັນທີເອົາເຄື່ອງ))));
+
+    aiCtx = {
+      ວັນທີປັດຈຸບັນ: today(),
+      ຍອດຂາຍ: dash && { ມື້ນີ້: dash.daily, ອາທິດນີ້: dash.weekly, ເດືອນນີ້: dash.monthly },
+      ທຽບອາທິດ: { ອາທິດນີ້_7ວັນຫຼ້າສຸດ: { ຍອດ: a, ຈຳນວນບິນ: ac }, ອາທິດແລ້ວ_7ວັນກ່ອນ: { ຍອດ: b, ຈຳນວນບິນ: bc }, ເປີເຊັນປ່ຽນ: b > 0 ? Math.round((a-b)/b*100) : null },
+      ໃບບິນຍັງບໍ່ຈ່າຍ: dash && { ຍອດ: dash.unpaidTotal, ຈຳນວນ: dash.unpaidCount },
+      ສິນຄ້າຂາຍດີເດືອນນີ້: top,
+      ສະຫຼຸບສະຕັອກ: { ຈຳນວນສິນຄ້າທັງໝົດ: plist.length, ໝົດ: plist.filter(p => p.ສະຖານະ === 'ໝົດ').length,
+        ໃກ້ໝົດ: plist.filter(p => p.ສະຖານະ === 'ໃກ້ໝົດ').length, ມູນຄ່າສະຕັອກ_ລາຄາທຶນ: stockValue },
+      ສິນຄ້າທັງໝົດ_ແລະ_ຄົງເຫຼືອ: plist,
+      ໜີ້ລູກຄ້າ: { ຍອດຄ້າງທັງໝົດ: unpaidAll, ຈຳນວນຄັ້ງທີ່ຄ້າງ: unpaidCount, ຈຳນວນລູກຄ້າທີ່ຄ້າງ: debtors.length, ລາຍຊື່ລູກຄ້າທີ່ຄ້າງ: debtors },
+      ລູກຄ້າຊື້ຫຼາຍສຸດ_8ຄົນ: (customers || []).map(c => ({ ຊື່: c.CustomerName, ຍອດຊື້ລວມ: Number(c.TotalSpent)||0, ຈຳນວນຄັ້ງ: Number(c.TotalOrders)||0 }))
+        .sort((x, y) => y.ຍອດຊື້ລວມ - x.ຍອດຊື້ລວມ).slice(0, 8),
+      ໃບບິນລ່າສຸດ_15ໃບ: (invoices || []).slice().sort(byDate).slice(0, 15).map(i => ({ ເລກບິນ: i.InvoiceNo, ວັນທີ: i.Date, ລູກຄ້າ: i.CustomerName || '-',
+        ຍອດ: Number(i.TotalAmount)||0, ຊຳລະ: i.PaymentMethod, ສະຖານະ: i.PaymentStatus })),
+      _customers: customers || [], _tx: tx || [], _products: prods
+    };
+    aiCtxAt = Date.now();
+  }
+  const { _customers, _tx, _products, ...ctx } = aiCtx;
+  const ql = q.toLowerCase();
+
+  // ຖ້າຄຳຖາມມີຊື່ສິນຄ້າ → ເພີ່ມລາຍລະອຽດ ແລະ ປະຫວັດເຂົ້າ-ອອກສະຕັອກ
+  const pm = _products.filter(p => { const n = String(p.ProductName || '').trim().toLowerCase(), s = String(p.SKU || '').trim().toLowerCase();
+    return (n.length > 1 && ql.includes(n)) || (s.length > 2 && ql.includes(s)); }).slice(0, 5);
+  if(pm.length) ctx['ສິນຄ້າທີ່ຖືກກ່າວເຖິງ'] = pm.map(p => {
+    const mv = _tx.filter(t => String(t.ProductID) === String(p.ProductID)).sort(byDate);
+    const sum = ty => mv.filter(t => t.Type === ty).reduce((s, t) => s + (Number(t.Quantity)||0), 0);
+    return { ຊື່: p.ProductName, ຄົງເຫຼືອ: Number(p.CurrentStock)||0, ໜ່ວຍ: p.Unit, ຂັ້ນຕ່ຳ: Number(p.MinStock)||0,
+      ລາຄາທຶນ: Number(p.CostPrice)||0, ລາຄາຂາຍ: Number(p.SellingPrice)||0,
+      ບັນທຶກເຂົ້າລວມ: sum('Stock In'), ບັນທຶກອອກລວມ: sum('Stock Out'),
+      ການເຄື່ອນໄຫວລ່າສຸດ_20: mv.slice(0, 20).map(t => ({ ວັນທີ: ymd(t.Date), ປະເພດ: t.Type === 'Stock In' ? 'ເຂົ້າ' : 'ອອກ', ຈຳນວນ: t.Quantity, ໝາຍເຫດ: t.Note })) };
+  });
+
+  // ຖ້າຄຳຖາມມີຊື່ລູກຄ້າ → ເພີ່ມປະຫວັດການຊື້
+  const m = _customers.find(c => String(c.CustomerName || '').trim().length > 2 && q.includes(String(c.CustomerName).trim()));
+  if(m){
+    const h = await g('getCustomerOrderHistory', m.CustomerID);
+    ctx['ລູກຄ້າທີ່ຖືກກ່າວເຖິງ'] = { ຊື່: m.CustomerName, ເບີໂທ: m.Phone, ຍອດຊື້ລວມ: Number(m.TotalSpent)||0, ຈຳນວນຄັ້ງຊື້: Number(m.TotalOrders)||0,
+      ປະຫວັດການຊື້ລ່າສຸດ: (h || []).slice(0, 15).map(x => ({ ວັນທີ: x.Date, ສິນຄ້າ: x.ProductName, ຈຳນວນ: x.Quantity, ລວມ: x.TotalPrice })) };
+  }
+  return ctx;
+}
+
+async function askGemini(q, history){
+  let key = store.get('pos_gemini_key');
+  if(!key){ setAiKey(); key = store.get('pos_gemini_key'); if(!key) throw new Error('ຍັງບໍ່ໄດ້ໃສ່ Gemini API Key'); }
+  const ctx = await buildAiContext(q);
+  const system =
+    'ເຈົ້າແມ່ນຜູ້ຊ່ວຍຂອງຮ້ານຄ້າ (ລະບົບ POS). ຕອບເປັນພາສາລາວ ຊັດເຈນ ຄົບຖ້ວນ. ສະກຸນເງິນ ກີບ (₭) ໃສ່ຈຸດຂັ້ນຫຼັກພັນ.\n' +
+    'ກົດເຫຼັກ:\n' +
+    '1) ໃຊ້ຕົວເລກຈາກ JSON ຕາມທີ່ມີເທົ່ານັ້ນ ຫ້າມເດົາ ຫ້າມແຕ່ງ ຫ້າມປັດເສດ. ຄ່າ "ຄ້າງມາແລ້ວ_ວັນ", "ຍອດຄ້າງລວມ", "ຄົງເຫຼືອ" ຖືກຄິດໄວ້ແລ້ວ ໃຫ້ນຳໃຊ້ໂດຍກົງ.\n' +
+    '2) ຖ້າຖາມສະຕັອກຂອງສິນຄ້າໃດ ໃຫ້ຫາຈາກ "ສິນຄ້າທັງໝົດ_ແລະ_ຄົງເຫຼືອ" ແລ້ວບອກ ຊື່ + ຄົງເຫຼືອ + ໜ່ວຍ + ສະຖານະ. ຖ້າຖາມ "ທັງໝົດ" ຫຼື "ທຸກລາຍການ" ໃຫ້ລະບຸຄົບທຸກລາຍການ ຫ້າມຕັດ. ຖ້າບໍ່ພົບຊື່ ໃຫ້ບອກວ່າບໍ່ພົບ ແລະແນະນຳຊື່ທີ່ໃກ້ຄຽງ.\n' +
+    '3) ຖ້າຖາມໜີ້ຂອງລູກຄ້າ ໃຫ້ຫາຈາກ "ໜີ້ລູກຄ້າ.ລາຍຊື່ລູກຄ້າທີ່ຄ້າງ" ແລ້ວບອກ: ຍອດຄ້າງລວມ, ຄ້າງມາດົນສຸດຈັກວັນ, ແລະລາຍການແຕ່ລະຄັ້ງຕາມວັນທີ (ວັນທີເອົາເຄື່ອງ, ຄ້າງມາຈັກວັນ, ເຄື່ອງທີ່ເອົາໄປ ພ້ອມລາຄາ, ຍອດຂອງຄັ້ງນັ້ນ). ຖ້າຊື່ບໍ່ຢູ່ໃນລາຍຊື່ ໃຫ້ບອກວ່າລູກຄ້ານີ້ບໍ່ມີໜີ້ຄ້າງ.\n' +
+    '4) ຖ້າຂໍ້ມູນບໍ່ພໍຕອບ ໃຫ້ບອກຕົງໆວ່າບໍ່ມີຂໍ້ມູນ.\n' +
+    '5) ຫ້າມໃຊ້ຮູບແບບ markdown (ຫ້າມ ** ຫຼື # ຫຼື |). ໃຫ້ໃຊ້ຂໍ້ຄວາມທຳມະດາ ແລະຂີດ - ນຳໜ້າແຕ່ລະລາຍການ ແຍກແຖວໃຫ້ອ່ານງ່າຍ.\n\n' +
+    'ຂໍ້ມູນຮ້ານ (JSON):\n' + JSON.stringify(ctx);
+  const contents = history.filter(m => m.text).map(m => ({ role: m.role === 'ai' ? 'model' : 'user', parts: [{ text: m.text }] }));
+  contents.push({ role: 'user', parts: [{ text: q }] });
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + AI_MODEL + ':generateContent', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents, generationConfig: { maxOutputTokens: 4000 } }) });
+  const j = await res.json();
+  if(j.error) throw new Error('Gemini: ' + j.error.message);
+  const parts = j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts;
+  return (parts ? parts.map(p => p.text || '').join('') : '') || 'AI ບໍ່ໄດ້ຕອບກັບ ລອງຖາມໃໝ່';
+}
+async function sendAi(){
+  const box = $('#aiInput'), q = box.value.trim(); if(!q) return;
+  box.value = '';
+  const historyForApi = aiHistory.filter(m => m.text !== 'ກຳລັງວິເຄາະ...' && !m.text.startsWith('ຜິດພາດ:')).slice(-10);
+  aiHistory.push({ role:'user', text:q });
+  aiHistory.push({ role:'ai', text:'ກຳລັງວິເຄາະ...' });
+  renderAi();
+  $('#aiSend').disabled = true;
+  try{ aiHistory[aiHistory.length - 1] = { role:'ai', text: await askGemini(q, historyForApi) }; }
+  catch(e){ aiHistory[aiHistory.length - 1] = { role:'ai', text: 'ຜິດພາດ: ' + e.message }; }
+  $('#aiSend').disabled = false; renderAi();
 }
 
 /* ======================= DASHBOARD ======================= */
@@ -427,7 +607,31 @@ async function loadPos(){
   S.settings = st;
   renderPosGrid(); renderTicket(); updateOtCount();
 }
-async function updateOtCount(){ try{ const t = await api('getOpenTickets'); $('#otCount').textContent = t.length ? `(${t.length})` : ''; }catch(e){} }
+
+// ---- ແຖບບິນຄ້າງ (ສະແດງຢູ່ໜ້າຂາຍຕະຫຼອດ) ----
+let OT = [];
+// ວັນທີຂອງບິນຄ້າງ ເກັບໃນ Sheet (ຄໍລຳ CreatedAt) — ແກ້ໄຂໄດ້ ແລະ ເຫັນຄືກັນທຸກເຄື່ອງ
+const otDate = t => t.CreatedAt;
+const toLocalInput = d => { const x = new Date(d); return isNaN(x) ? '' : ymd(x) + 'T' + pad2(x.getHours()) + ':' + pad2(x.getMinutes()); };
+const dmy = d => { const y = ymd(d); return y ? y.split('-').reverse().join('/') : ''; };
+const tName = t => { const n = String(t.TicketName || t.CustomerName || '-'); return /^\d{4}-\d\d-\d\dT/.test(n) ? dmy(n) : n; };
+async function updateOtCount(){
+  try{ OT = await api('getOpenTickets'); }catch(e){ return; }
+  $('#otCount').textContent = OT.length ? `(${OT.length})` : '';
+  renderOtStrip();
+}
+function renderOtStrip(){
+  const el = $('#otStrip'); if(!el) return;
+  el.innerHTML = `<div class="ot-chip new" onclick="newTicket()">+ ບິນໃໝ່</div>` + OT.map(t => `
+    <div class="ot-chip ${t.TicketID === cart.ticketId ? 'active' : ''}" onclick="loadTicket('${esc(t.TicketID)}')">
+      <button class="d" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')" aria-label="ລົບ">×</button>
+      <div class="n">${esc(tName(t))}</div>
+      <div class="dt num">${dmy(otDate(t)).slice(0,5)}</div>
+      <div class="s">${t.ItemCount} ລາຍການ</div>
+      <div class="t num">${money(t.TotalAmount)}</div>
+    </div>`).join('');
+}
+
 function posList(){
   const q = $('#posSearch').value.trim().toLowerCase();
   return S.products.filter(p => !q || String(p.ProductName).toLowerCase().includes(q) || String(p.SKU).toLowerCase().includes(q));
@@ -478,7 +682,7 @@ function renderTicket(){
   const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === cart.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
   $('#ticket').innerHTML = `
     <div class="head">
-      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(cart.ticketName || '') : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
+      <div class="row"><h2 style="margin:0">${cart.ticketId ? 'ບິນຄ້າງ: ' + esc(/^\d{4}-\d\d-\d\dT/.test(cart.ticketName) ? dmy(cart.ticketName) : (cart.ticketName || '')) : 'ບິນໃໝ່'}</h2><span class="spacer"></span>
         <button class="btn sm" onclick="clearCart()">ລ້າງ</button></div>
       <select class="inp" id="tCust" style="margin-top:10px"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select>
       <div class="row" style="margin-top:8px">
@@ -507,17 +711,19 @@ function renderTicket(){
       <label style="flex:1;font-size:12px;color:var(--muted)">ສົດ<input class="inp num" type="number" value="${esc(cart.cash)}" oninput="cart.cash=this.value;cart.transfer=Math.max(0,cartTotal()-(Number(this.value)||0));$('#tTr').value=cart.transfer" style="margin:0"></label>
       <label style="flex:1;font-size:12px;color:var(--muted)">ໂອນ<input id="tTr" class="inp num" type="number" value="${esc(cart.transfer)}" oninput="cart.transfer=this.value" style="margin:0"></label></div>` : ''}
     ${cart.pay !== 'Cash' && S.settings.QRCodeURL ? `<div style="text-align:center;margin-top:8px"><img src="${esc(S.settings.QRCodeURL)}" style="width:130px" alt="QR ຮັບເງິນໂອນ"></div>` : ''}
-    <div class="row" style="margin-top:8px">
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">ວັນທີ-ເວລາບິນ (ປ່ອຍຫວ່າງ = ຕອນນີ້ · ແກ້ໄດ້ຕະຫຼອດ)</div>
+    <div class="row" style="margin-top:4px">
       <input class="inp" type="datetime-local" value="${esc(cart.date)}" onchange="cart.date=this.value" title="ວັນທີຂາຍ (ປ່ອຍຫວ່າງ = ຕອນນີ້)" style="flex:1;margin:0">
       <button class="btn" onclick="signPad()">${cart.signature ? '✓ ເຊັນແລ້ວ' : 'ເຊັນຊື່'}</button>
     </div>
     <input class="inp" placeholder="ໝາຍເຫດ" value="${esc(cart.note)}" oninput="cart.note=this.value" style="margin-top:8px">
     <div class="row" style="margin-top:12px">
-      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>ພັກບິນ</button>
+      <button class="btn" style="flex:1" onclick="holdTicket()" ${cart.items.length ? '' : 'disabled'}>${cart.ticketId ? 'ບັນທຶກແກ້ໄຂ' : 'ພັກບິນ'}</button>
       <button class="btn pri" style="flex:2" id="btnCheckout" onclick="checkout()" ${cart.items.length ? '' : 'disabled'}>ຮັບເງິນ ${money(total)}</button>
     </div>`;
   $('#tCust').onchange = e => { const c = S.customers.find(x => x.CustomerID === e.target.value);
     cart.customerId = e.target.value; cart.customerName = c ? c.CustomerName : ''; cart.phone = c ? String(c.Phone||'') : ''; renderTicket(); };
+  renderOtStrip();
   updChange();
 }
 function updChange(){
@@ -548,130 +754,105 @@ function signPad(){
   };
 }
 
-async function holdTicket(){
-  const name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', cart.ticketName || cart.customerName || '');
-  if(name === null) return;
-  cart.ticketName = name;
-  const r = await run(() => api('saveOpenTicket', { ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
-    customerName:cart.customerName, phone:cart.phone, items:cart.items }), 'ພັກບິນແລ້ວ');
-  if(r){ clearCart(); updateOtCount(); }
+const ticketPayload = () => ({ ticketId:cart.ticketId, ticketName:cart.ticketName, customerId:cart.customerId,
+  customerName:cart.customerName, phone:cart.phone, items:cart.items, createdAt:cart.date || '' });
+
+// ບັນທຶກບິນຄ້າງທີ່ກຳລັງແກ້ຢູ່ ໂດຍບໍ່ຖາມຊື່ (ໃຊ້ກ່ອນສະລັບໄປບິນອື່ນ)
+async function saveTicketSilently(){
+  if(!cart.ticketId || !cart.items.length) return true;
+  return !!(await run(() => api('saveOpenTicket', ticketPayload())));
 }
 
-/* ---------- ບິນຄ້າງ: ລາຍການ / ເບິ່ງ / ແກ້ໄຂ / ເປີດຂາຍ / ລົບ ---------- */
-let TK = null;
-const tkTotal = () => TK.items.reduce((s,i) => s + N(i.quantity) * N(i.unitPrice), 0);
+async function holdTicket(){
+  let name = cart.ticketName || cart.customerName || '';
+  if(!cart.ticketId){                       // ບິນໃໝ່ → ຖາມຊື່
+    name = prompt('ຕັ້ງຊື່ບິນຄ້າງ (ເຊັ່ນ ໂຕະ 3, ຊື່ລູກຄ້າ)', name);
+    if(name === null) return;
+  }
+  cart.ticketName = name;
+  const editing = !!cart.ticketId;
+  const r = await run(() => api('saveOpenTicket', ticketPayload()), editing ? 'ບັນທຶກການແກ້ໄຂແລ້ວ' : 'ພັກບິນແລ້ວ');
+  if(!r) return;
+  if(!editing) clearCart();                 // ບິນທີ່ແກ້ຢູ່ ຈະຄ້າງໄວ້ໃຫ້ແກ້ຕໍ່ໄດ້
+  updateOtCount();
+}
+
+async function newTicket(){
+  if(cart.ticketId){ if(!await saveTicketSilently()) return; }
+  else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເລີ່ມບິນໃໝ່ ແລະ ລ້າງບິນນີ້?')) return;
+  clearCart(); updateOtCount();
+}
 
 async function showOpenTickets(){
   openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   const list = await run(() => api('getOpenTickets')); if(!list) return;
-  $('#mBody').innerHTML = list.length ? `<div class="tbl-wrap"><table><tr><th>ຊື່ບິນ</th><th>ເວລາ</th><th class="r">ຍອດ</th><th></th></tr>
-    ${list.map(t => `<tr class="click" onclick="viewTicket('${esc(t.TicketID)}')">
-      <td><b>${esc(t.TicketName || '-')}</b><br><small>${esc(t.CustomerName || '')} · ${t.ItemCount} ລາຍການ</small></td>
-      <td>${fmtDate(t.CreatedAt)}</td><td class="r num">${money(t.TotalAmount)}</td>
-      <td class="r" style="white-space:nowrap">
-        <button class="btn sm" onclick="event.stopPropagation();viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
-        <button class="btn sm" onclick="event.stopPropagation();viewTicket('${esc(t.TicketID)}',true)">ແກ້ໄຂ</button>
-        <button class="btn sm pri" onclick="event.stopPropagation();loadTicket('${esc(t.TicketID)}')">ເປີດຂາຍ</button>
-        <button class="btn sm danger" onclick="event.stopPropagation();delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`
-    : '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>';
+  OT = list; $('#otCount').textContent = list.length ? `(${list.length})` : ''; renderOtStrip();
+  if(!list.length){ $('#mBody').innerHTML = '<div class="empty">ບໍ່ມີບິນຄ້າງ</div>'; return; }
+  const sorted = list.slice().sort((x, y) => new Date(otDate(y)) - new Date(otDate(x)));
+  const groups = {};
+  sorted.forEach(t => { const k = ymd(otDate(t)) || '-'; (groups[k] = groups[k] || []).push(t); });
+  $('#mBody').innerHTML = Object.keys(groups).sort().reverse().map(k => {
+    const g = groups[k], sum = g.reduce((s, t) => s + (Number(t.TotalAmount) || 0), 0);
+    return `<div class="ot-day"><b>📅 ${dmy(k) || 'ບໍ່ມີວັນທີ'}</b><span class="num">${g.length} ບິນ · ${money(sum)}</span></div>
+      <div class="tbl-wrap"><table>${g.map(t => `<tr>
+        <td><b>${esc(tName(t))}</b><br><small>${esc(t.CustomerName || '')} ${t.ItemCount} ລາຍການ · ${esc(toLocalInput(otDate(t)).slice(11))}</small></td>
+        <td class="r num">${money(t.TotalAmount)}</td>
+        <td class="r" style="white-space:nowrap"><button class="btn sm" onclick="viewTicket('${esc(t.TicketID)}')">ເບິ່ງ</button>
+          <button class="btn sm pri" onclick="loadTicket('${esc(t.TicketID)}')">ແກ້ໄຂ</button>
+          <button class="btn sm danger" onclick="delTicket('${esc(t.TicketID)}')">ລົບ</button></td></tr>`).join('')}</table></div>`;
+  }).join('');
 }
-async function viewTicket(id, edit){
-  openModal('ບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
+
+// ເບິ່ງບິນຄ້າງຄືນ + ແກ້ຊື່/ວັນທີ
+async function viewTicket(id){
+  openModal('ເບິ່ງບິນຄ້າງ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
-  if(!S.products.length || !S.customers.length) await refreshBase();
-  const t = r.ticket;
-  TK = { ticketId:t.TicketID, ticketName:t.TicketName || '', customerId:t.CustomerID || '', customerName:t.CustomerName || '',
-    phone:String(t.Phone || ''), createdAt:t.CreatedAt, items:(r.items || []).map(i => ({ ...i })) };
-  edit ? tkEdit() : tkView();
-}
-function tkView(){
-  $('#mTitle').textContent = 'ບິນຄ້າງ: ' + (TK.ticketName || '-');
+  const t = r.ticket, items = r.items || [];
+  const total = items.reduce((s, i) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+  const dt = toLocalInput(t.CreatedAt);
   $('#mBody').innerHTML = `
-    <div style="margin-bottom:10px;font-size:14px">
-      <div><span style="color:var(--muted)">ລູກຄ້າ:</span> <b>${esc(TK.customerName || 'ລູກຄ້າທົ່ວໄປ')}</b> ${TK.phone ? '· ' + esc(TK.phone) : ''}</div>
-      <div><span style="color:var(--muted)">ເວລາພັກບິນ:</span> ${fmtDate(TK.createdAt)}</div>
-    </div>
-    <div class="tbl-wrap">${TK.items.length ? `<table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
-      ${TK.items.map(i => `<tr><td>${esc(i.productName)}</td><td class="r num">${esc(i.quantity)} ${esc(i.unit || '')}</td>
-        <td class="r num">${money(i.unitPrice)}</td><td class="r num">${money(N(i.quantity) * N(i.unitPrice))}</td></tr>`).join('')}</table>`
-      : '<div class="empty">ບິນນີ້ບໍ່ມີສິນຄ້າ</div>'}</div>
-    <div class="num" style="text-align:right;font-size:20px;font-weight:700;margin:10px 0">ລວມ ${money(tkTotal())}</div>
-    <div class="row"><button class="btn" onclick="showOpenTickets()">← ກັບຄືນ</button><span class="spacer"></span>
-      <button class="btn" onclick="tkEdit()">ແກ້ໄຂ</button>
-      <button class="btn pri" onclick="loadTicket('${esc(TK.ticketId)}')">ເປີດໃນໜ້າຂາຍ</button></div>`;
-}
-function tkEdit(){
-  $('#mTitle').textContent = 'ແກ້ໄຂບິນຄ້າງ';
-  const custOpts = S.customers.map(c => `<option value="${esc(c.CustomerID)}" ${c.CustomerID === TK.customerId ? 'selected' : ''}>${esc(c.CustomerName)}${c.Phone ? ' · ' + esc(c.Phone) : ''}</option>`).join('');
-  const prodOpts = S.products.map(p => `<option value="${esc(p.ProductID)}">${esc(p.ProductName)} (ເຫຼືອ ${esc(p.CurrentStock)})</option>`).join('');
-  $('#mBody').innerHTML = `
-    <label class="f">ຊື່ບິນ<input id="tkName" value="${esc(TK.ticketName)}"></label>
-    <label class="f">ລູກຄ້າ<select id="tkCust"><option value="">— ລູກຄ້າທົ່ວໄປ —</option>${custOpts}</select></label>
     <div class="grid g2" style="gap:0 14px">
-      <label class="f">ຊື່ລູກຄ້າ<input id="tkCName" value="${esc(TK.customerName)}"></label>
-      <label class="f">ເບີໂທ<input id="tkPhone" value="${esc(TK.phone)}"></label>
+      <label class="f">ຊື່ບິນ<input id="vName" value="${esc(tName(t) === '-' ? '' : (/^\\d{4}-\\d\\d-\\d\\dT/.test(String(t.TicketName)) ? '' : t.TicketName))}"></label>
+      <label class="f">ວັນທີ-ເວລາບິນ (ແກ້ໄດ້)<input id="vDate" type="datetime-local" value="${esc(dt)}"></label>
     </div>
-    <div id="tkItems"></div>
-    <div class="row" style="margin-top:8px">
-      <select class="inp" id="tkAddSel" style="flex:1;margin:0"><option value="">+ ເພີ່ມສິນຄ້າ...</option>${prodOpts}</select>
-    </div>
-    <div id="tkTotal" class="num" style="text-align:right;font-size:20px;font-weight:700;margin:12px 0"></div>
-    <div class="row"><button class="btn" onclick="tkView()">ຍົກເລີກ</button><span class="spacer"></span>
-      <button class="btn pri" id="tkSave">ບັນທຶກ</button></div>`;
-  $('#tkName').oninput = e => TK.ticketName = e.target.value;
-  $('#tkCName').oninput = e => TK.customerName = e.target.value;
-  $('#tkPhone').oninput = e => TK.phone = e.target.value;
-  $('#tkCust').onchange = e => {
-    const c = S.customers.find(x => x.CustomerID === e.target.value);
-    TK.customerId = e.target.value; TK.customerName = c ? c.CustomerName : ''; TK.phone = c ? String(c.Phone || '') : '';
-    $('#tkCName').value = TK.customerName; $('#tkPhone').value = TK.phone;
+    <small>${esc(t.CustomerName || 'ລູກຄ້າທົ່ວໄປ')} ${esc(t.Phone || '')}</small>
+    <div class="tbl-wrap"><table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th class="r">ລວມ</th></tr>
+      ${items.map(i => `<tr><td>${esc(i.productName)}</td><td class="r num">${esc(i.quantity)} ${esc(i.unit || '')}</td><td class="r num">${money(i.unitPrice)}</td>
+        <td class="r num">${money((Number(i.quantity) || 0) * (Number(i.unitPrice) || 0))}</td></tr>`).join('')}</table></div>
+    <div class="num" style="text-align:right;font-weight:700;font-size:18px;margin:10px 0">ລວມ ${money(total)}</div>
+    <div class="row"><button class="btn" onclick="showOpenTickets()">← ກັບຄືນ</button><span class="spacer"></span>
+      <button class="btn" id="vSave">ບັນທຶກຊື່/ວັນທີ</button>
+      <button class="btn pri" onclick="loadTicket('${esc(id)}')">ເປີດແກ້ໄຂບິນ</button></div>`;
+  $('#vSave').onclick = async () => {
+    const date = $('#vDate').value, name = $('#vName').value.trim();
+    const ok = await run(() => api('saveOpenTicket', { ticketId:id, ticketName:name, customerId:t.CustomerID || '', customerName:t.CustomerName || '',
+      phone:String(t.Phone || ''), items, createdAt:date }), 'ບັນທຶກແລ້ວ');
+    if(!ok) return;
+    if(cart.ticketId === id){ cart.ticketName = name; cart.date = date; renderTicket(); }
+    await updateOtCount(); showOpenTickets();
   };
-  $('#tkAddSel').onchange = e => {
-    const p = S.products.find(x => String(x.ProductID) === e.target.value); if(!p) return;
-    const it = TK.items.find(x => String(x.productId) === String(p.ProductID));
-    if(it) it.quantity = N(it.quantity) + 1;
-    else TK.items.push({ productId:p.ProductID, productName:p.ProductName, quantity:1, unitPrice:N(p.SellingPrice), unit:p.Unit || '' });
-    e.target.value = ''; tkDrawItems();
-  };
-  $('#tkSave').onclick = tkSave;
-  tkDrawItems();
 }
-function tkDrawTotal(){ const el = $('#tkTotal'); if(el) el.textContent = 'ລວມ ' + money(tkTotal()); }
-function tkDrawItems(){
-  $('#tkItems').innerHTML = TK.items.length ? `<div class="tbl-wrap"><table><tr><th>ສິນຄ້າ</th><th class="r">ຈຳນວນ</th><th class="r">ລາຄາ</th><th></th></tr>
-    ${TK.items.map((i,k) => `<tr><td>${esc(i.productName)}<br><small style="color:var(--muted)">${esc(i.unit || '')}</small></td>
-      <td class="r"><input class="inp inline num" type="number" min="0" step="${unitIsWeight(i.unit) ? '0.01' : '1'}" value="${esc(i.quantity)}" style="width:80px" oninput="TKset(${k},'quantity',this.value)"></td>
-      <td class="r"><input class="inp inline num" type="number" min="0" value="${esc(i.unitPrice)}" style="width:110px" oninput="TKset(${k},'unitPrice',this.value)"></td>
-      <td class="r"><button class="btn sm danger" onclick="TKdel(${k})" aria-label="ລົບ">×</button></td></tr>`).join('')}</table></div>`
-    : '<div class="empty">ຍັງບໍ່ມີສິນຄ້າ — ເລືອກສິນຄ້າດ້ານລຸ່ມ</div>';
-  tkDrawTotal();
-}
-function TKset(k, f, v){ TK.items[k][f] = v; tkDrawTotal(); }
-function TKdel(k){ TK.items.splice(k, 1); tkDrawItems(); }
-async function tkSave(){
-  const items = TK.items.filter(i => N(i.quantity) > 0).map(i => ({ ...i, quantity:N(i.quantity), unitPrice:N(i.unitPrice) }));
-  if(!items.length) return toast('ບິນຕ້ອງມີສິນຄ້າຢ່າງໜ້ອຍ 1 ລາຍການ (ຈຳນວນ > 0)', true);
-  $('#tkSave').disabled = true;
-  const r = await run(() => api('saveOpenTicket', { ticketId:TK.ticketId, ticketName:TK.ticketName, customerId:TK.customerId,
-    customerName:TK.customerName, phone:TK.phone, items }), 'ບັນທຶກບິນຄ້າງແລ້ວ');
-  if(!r){ $('#tkSave').disabled = false; return; }
-  // ຖ້າບິນນີ້ເປີດຢູ່ໃນໜ້າຂາຍ ໃຫ້ຊິ້ງຂໍ້ມູນນຳ
-  if(cart.ticketId === TK.ticketId){
-    Object.assign(cart, { ticketName:TK.ticketName, customerId:TK.customerId, customerName:TK.customerName, phone:TK.phone, items });
-    if(CUR === 'pos') renderTicket();
-  }
-  updateOtCount();
-  viewTicket(TK.ticketId);
-}
+
 async function loadTicket(id){
-  if(cart.items.length && !cart.ticketId && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
+  if(id === cart.ticketId){ closeModal(); return; }
+  if(cart.ticketId){ if(!await saveTicketSilently()) return; }   // ບັນທຶກບິນເກົ່າອັດຕະໂນມັດ
+  else if(cart.items.length && !confirm('ບິນປັດຈຸບັນຍັງມີສິນຄ້າ. ເປີດບິນຄ້າງແທນ?')) return;
   const r = await run(() => api('getOpenTicketDetail', id)); if(!r) return;
   cart = { ...newCart(), ticketId:r.ticket.TicketID, ticketName:r.ticket.TicketName||'', customerId:r.ticket.CustomerID||'',
-    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[] };
-  closeModal(); if(CUR !== 'pos') go('pos'); else renderTicket();
+    customerName:r.ticket.CustomerName||'', phone:String(r.ticket.Phone||''), items:r.items||[], date:toLocalInput(r.ticket.CreatedAt) };
+  closeModal();
+  if(CUR !== 'pos') go('pos'); else { renderTicket(); updateOtCount(); }
+  window.scrollTo({ top:0, behavior:'smooth' });
 }
-async function delTicket(id){ if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
-  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){ showOpenTickets(); updateOtCount(); } }
+
+async function delTicket(id){
+  if(!confirm('ລົບບິນຄ້າງນີ້?')) return;
+  if(await run(() => api('deleteOpenTicket', id), 'ລົບແລ້ວ')){
+    if(cart.ticketId === id) cart = newCart();
+    await updateOtCount(); renderTicket();
+    if($('#modalBg').classList.contains('open')) showOpenTickets();
+  }
+}
 
 async function checkout(){
   const total = cartTotal();
@@ -775,8 +956,8 @@ let TX = [];
 async function loadStock(){ const [t] = await Promise.all([api('getTransactions'), refreshBase()]); TX = t; renderStock(); }
 ['#sxType','#sxSearch','#sxFrom','#sxTo'].forEach(id => $(id).addEventListener('input', renderStock));
 function filteredTx(){
-  const ty = $('#sxType').value, q = norm($('#sxSearch').value), from = $('#sxFrom').value, to = $('#sxTo').value;
-  return TX.filter(t => (ty === 'all' || t.Type === ty) && (!q || norm(t.ProductName + ' ' + t.Note).includes(q)) && inRange(t.Date, from, to));
+  const ty = $('#sxType').value, q = $('#sxSearch').value.trim().toLowerCase(), from = $('#sxFrom').value, to = $('#sxTo').value;
+  return TX.filter(t => (ty === 'all' || t.Type === ty) && (!q || (String(t.ProductName) + ' ' + String(t.Note)).toLowerCase().includes(q)) && inRange(t.Date, from, to));
 }
 function renderStock(){
   const list = filteredTx();
@@ -797,34 +978,18 @@ function exportStock(){
 async function stockForm(txId, presetPid){
   if(!S.products.length) await refreshBase();
   const t = TX.find(x => x.TxID === txId) || { Type:'Stock In', ProductID:presetPid };
+  const opts = S.products.map(p => `<option value="${esc(p.ProductID)}" ${p.ProductID === t.ProductID ? 'selected' : ''}>${esc(p.ProductName)} (ເຫຼືອ ${p.CurrentStock})</option>`).join('');
   openModal(txId ? 'ແກ້ໄຂລາຍການສະຕັອກ' : 'ບັນທຶກເຂົ້າ-ອອກສະຕັອກ', `
     <label class="f">ປະເພດ<select id="xType">${opt('Stock In','ເຂົ້າ (ຮັບເຄື່ອງ)',t.Type)}${opt('Stock Out','ອອກ (ເສຍ, ໝົດອາຍຸ, ເອົາໄປໃຊ້)',t.Type)}</select></label>
-    <label class="f">ສິນຄ້າ (ພິມຊື່ ຫຼື ລະຫັດ)<input id="xSearch" placeholder="ພິມຊື່ສິນຄ້າ ຫຼື SKU..." autocomplete="off"></label>
-    <div id="xPick" style="font-size:14px;color:var(--jade);font-weight:600;margin:-4px 0 6px"></div>
-    <div id="xList" style="max-height:230px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-bottom:12px"></div>
-    <input type="hidden" id="xProd" value="${esc(t.ProductID || '')}">
+    <label class="f">ສິນຄ້າ<select id="xProd">${opts}</select></label>
     <label class="f">ຈຳນວນ<input id="xQty" type="number" step="any" value="${esc(t.Quantity ?? '')}"></label>
     <label class="f">ວັນທີ<input id="xDate" type="date" value="${t.Date ? ymd(t.Date) : today()}"></label>
     <label class="f">ໝາຍເຫດ<input id="xNote" value="${esc(t.Note)}"></label>
     <div class="row"><span class="spacer"></span><button class="btn" onclick="closeModal()">ຍົກເລີກ</button><button class="btn pri" id="xSave">ບັນທຶກ</button></div>`);
-  const draw = () => {
-    const q = norm($('#xSearch').value), cur = String($('#xProd').value);
-    const all = S.products.filter(p => !q || norm(p.ProductName + ' ' + p.SKU).includes(q));
-    const l = all.slice(0, 60), sel = S.products.find(p => String(p.ProductID) === cur);
-    $('#xPick').textContent = sel ? '✓ ເລືອກແລ້ວ: ' + sel.ProductName + ' (ເຫຼືອ ' + sel.CurrentStock + ' ' + (sel.Unit || '') + ')' : '';
-    $('#xList').innerHTML = l.length ? l.map(p => `<div data-id="${esc(p.ProductID)}" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--line);${String(p.ProductID) === cur ? 'background:var(--jade-soft);font-weight:600' : ''}">
-      ${esc(p.ProductName)}<br><small style="color:var(--muted)">${esc(p.SKU || '-')} · ເຫຼືອ ${esc(p.CurrentStock)} ${esc(p.Unit || '')}</small></div>`).join('')
-      + (all.length > 60 ? `<div class="empty">ສະແດງ 60 ຈາກ ${all.length} ລາຍການ — ພິມເພີ່ມເພື່ອກອງ</div>` : '')
-      : '<div class="empty">ບໍ່ພົບສິນຄ້າ</div>';
-  };
-  $('#xSearch').oninput = draw;
-  $('#xSearch').onkeydown = e => { if(e.key !== 'Enter') return; e.preventDefault(); const f = $('#xList [data-id]'); if(f) f.click(); };
-  $('#xList').onclick = e => { const d = e.target.closest('[data-id]'); if(!d) return; $('#xProd').value = d.dataset.id; draw(); $('#xQty').focus(); };
-  draw();
-  setTimeout(() => (t.ProductID ? $('#xQty') : $('#xSearch')).focus(), 50);
+  setTimeout(() => $('#xQty').focus(), 50);
   $('#xSave').onclick = async () => {
     const d = { txId, type:$('#xType').value, productId:$('#xProd').value, quantity:$('#xQty').value, date:$('#xDate').value, note:$('#xNote').value };
-    if(!d.productId) return toast('ກະລຸນາເລືອກສິນຄ້າ (ແຕະລາຍການສິນຄ້າກ່ອນ)', true);
+    if(!d.productId) return toast('ກະລຸນາເລືອກສິນຄ້າ', true);
     $('#xSave').disabled = true;
     if(await run(() => api(txId ? 'updateStockTransaction' : 'recordStockTransaction', d), 'ບັນທຶກແລ້ວ')){ closeModal(); reloadActive(); }
     else $('#xSave').disabled = false;
@@ -861,8 +1026,6 @@ function exportInvoices(){
 
 async function showInvoice(no){
   openModal('ໃບບິນ', '<div class="empty">ກຳລັງໂຫຼດ...</div>');
-  // ໃຫ້ແນ່ໃຈວ່າມີລາຍການສິນຄ້າແລ້ວ (ເພື່ອຫາໜ່ວຍນັບໃນໃບບິນ)
-  if(!S.products.length){ try{ await refreshBase(); }catch(e){} }
   const [r, st] = await Promise.all([run(() => api('getInvoiceDetail', no)), api('getSettings').catch(() => ({}))]);
   if(!r) return;
   S.settings = st;
@@ -875,37 +1038,19 @@ async function showInvoice(no){
       <button class="btn pri" onclick="printReceipt()">ພິມໃບບິນ</button></div>`;
 }
 function receiptHtml(inv, items, st){
-  const sig  = String(inv.Signature || '');
-  const head = store.get('pos_bill_head');
-  const foot = store.get('pos_bill_foot') || 'ຂອບໃຈທີ່ອຸດໜູນ';
-  const qtySum = items.reduce((s,i) => s + N(i.Quantity), 0);
-  const cell = 'padding:2px 0;border-bottom:1px dotted #bbb';
-  const rows = items.map((i, k) => `
-    <tr><td colspan="3" style="padding:5px 0 0;border:0"><b>${k + 1}. ${esc(i.ProductName)}</b></td></tr>
-    <tr>
-      <td class="num" style="${cell}">${esc(i.Quantity)} ${esc(i.Unit || unitOf(i.ProductID))}</td>
-      <td class="r num" style="${cell}">@ ${money(i.UnitPrice)}</td>
-      <td class="r num" style="${cell}"><b>${money(i.LineTotal ?? N(i.Quantity) * N(i.UnitPrice))}</b></td>
-    </tr>`).join('');
+  const sig = String(inv.Signature || '');
   return `<div style="text-align:center"><b style="font-size:18px">${esc(st.ShopName || 'ຮ້ານຂອງຂ້ອຍ')}</b><br>
-    <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small>
-    ${head ? `<div style="white-space:pre-line;margin-top:6px;font-size:13px">${esc(head)}</div>` : ''}</div>
+    <small>${esc(st.ShopAddress || '')}${st.ShopPhone ? '<br>ໂທ ' + esc(st.ShopPhone) : ''}</small></div>
     <hr style="border:0;border-top:1px dashed #999">
-    <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ/ເວລາ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
-    <table style="margin-top:8px;width:100%;border-collapse:collapse">
-      <tr><th style="text-align:left">ຈຳນວນ</th><th class="r">ລາຄາຂາຍ/ໜ່ວຍ</th><th class="r">ລວມ</th></tr>
-      ${rows}
-    </table>
-    <div style="border-top:1px dashed #999;margin-top:8px;padding-top:6px;font-size:12px">
-      ທັງໝົດ ${items.length} ລາຍການ · ຈຳນວນລວມ ${qtySum}</div>
-    <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:6px">
-      <span>ລວມທັງໝົດ</span><span class="num">${money(inv.TotalAmount)}</span></div>
+    <small>ເລກບິນ: ${esc(inv.InvoiceNo)}<br>ວັນທີ: ${fmtDate(inv.Date)}${inv.CustomerName ? '<br>ລູກຄ້າ: ' + esc(inv.CustomerName) : ''}${inv.Phone ? ' (' + esc(inv.Phone) + ')' : ''}</small>
+    <table style="margin-top:8px"><tr><th>ລາຍການ</th><th class="r">ຈຳນວນ</th><th class="r">ລວມ</th></tr>
+    ${items.map(i => `<tr><td>${esc(i.ProductName)}<br><small>@ ${money(i.UnitPrice)}</small></td><td class="r num">${i.Quantity}</td><td class="r num">${money(i.LineTotal)}</td></tr>`).join('')}</table>
+    <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:700;margin-top:10px"><span>ລວມທັງໝົດ</span><span class="num">${money(inv.TotalAmount)}</span></div>
     <small>ຊຳລະ: ${esc(payLabel(inv.PaymentMethod))}${inv.PaymentMethod === 'Cash+Transfer' ? ` (ສົດ ${money(inv.CashAmount)} / ໂອນ ${money(inv.TransferAmount)})` : ''}
       · ${inv.PaymentStatus === 'Paid' ? 'ຈ່າຍແລ້ວ' : 'ຍັງບໍ່ຈ່າຍ'}${inv.Note ? '<br>ໝາຍເຫດ: ' + esc(inv.Note) : ''}</small>
     ${sig.startsWith('data:image') ? `<div style="text-align:center;margin-top:10px"><img src="${esc(sig)}" style="width:180px" alt="ລາຍເຊັນ"><br><small>ລາຍເຊັນລູກຄ້າ</small></div>` : ''}
     ${st.QRCodeURL && inv.PaymentStatus !== 'Paid' ? `<div style="text-align:center;margin-top:10px"><img src="${esc(st.QRCodeURL)}" style="width:160px" alt="QR"><br><small>ສະແກນເພື່ອໂອນ</small></div>` : ''}
-    <hr style="border:0;border-top:1px dashed #999">
-    <div style="text-align:center;white-space:pre-line;font-size:13px">${esc(foot)}</div>`;
+    <p style="text-align:center;margin-top:12px"><small>ຂອບໃຈທີ່ອຸດໜູນ</small></p>`;
 }
 function printReceipt(){
   const w = window.open('', '_blank', 'width=420,height=640'); if(!w) return toast('ບຣາວເຊີບລັອກໜ້າຕ່າງພິມ — ກະລຸນາອະນຸຍາດ pop-up', true);
@@ -1137,8 +1282,7 @@ async function debtCustomerSummary(){
 
 /* ======================= SETTINGS ======================= */
 async function loadSettings(){
-  $('#cfgUrl').value = store.get('pos_api_url') || DEFAULT_API_URL; $('#cfgToken').value = store.get('pos_api_token') || DEFAULT_API_TOKEN;
-  $('#sHead').value = store.get('pos_bill_head'); $('#sFoot').value = store.get('pos_bill_foot');
+  $('#cfgUrl').value = (store.get('pos_api_url') || DEFAULT_API_URL); $('#cfgToken').value = (store.get('pos_api_token') || DEFAULT_API_TOKEN);
   if(!(store.get('pos_api_url') || DEFAULT_API_URL)) return;
   const [st, u] = await Promise.all([api('getSettings'), api('getUnits')]);
   S.settings = st; S.units = u;
@@ -1148,8 +1292,6 @@ async function loadSettings(){
   $('#sQrPrev').dataset.url = st.QRCodeURL || '';
   renderUnits();
 }
-$('#sHead').oninput = e => store.set('pos_bill_head', e.target.value);
-$('#sFoot').oninput = e => store.set('pos_bill_foot', e.target.value);
 async function saveConn(){
   store.set('pos_api_url', $('#cfgUrl').value.trim()); store.set('pos_api_token', $('#cfgToken').value.trim());
   if(await run(() => api('getSettings'), 'ເຊື່ອມຕໍ່ສຳເລັດ')){ loadSettings(); applyBrand(); }
