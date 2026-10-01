@@ -148,15 +148,25 @@ textarea{min-height:70px;resize:vertical}
 #loader{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0;z-index:70;transition:width .3s}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ---------- mobile: ໃຊ້ແບບຈໍໃຫຍ່ ---------- */
+/* ---------- mobile: ເມນູໄອຄອນນ້ອຍຢູ່ຊ້າຍ + ເນື້ອຫາເຕັມຈໍ ---------- */
 @media (max-width:860px){
-  .app{grid-template-columns:170px 1fr}
-  nav.side{padding:14px 8px}
-  nav.side button{padding:9px 8px;font-size:13px}
-  main{padding:14px 10px 40px}
-  .g2{grid-template-columns:1fr}
+  .app{grid-template-columns:46px 1fr}
+  nav.side{position:sticky;top:0;height:100vh;height:100dvh;padding:6px 2px;gap:2px;
+    overflow-y:auto;overflow-x:hidden;align-self:start}
+  .brand{display:none}
+  nav.side button{font-size:0;justify-content:center;padding:10px 0;gap:0;width:100%}
+  nav.side .ico{font-size:21px;width:auto}
+  main{padding:12px 8px 40px}
+  h1{font-size:20px;margin-bottom:12px}
+  .panel{padding:12px;overflow-x:auto}
+  .g2,.g3{grid-template-columns:1fr}
   .pos{grid-template-columns:1fr}
+  .pgrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
   .ticket{position:static;order:-1}
+  .ticket .lines{max-height:26vh}
+  .chatbox{height:calc(100vh - 230px)}
+  .modal-bg{padding:12px 6px}
+  #toast{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
 }
 </style>
 </head>
