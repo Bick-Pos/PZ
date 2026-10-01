@@ -148,14 +148,24 @@ textarea{min-height:70px;resize:vertical}
 #loader{position:fixed;top:0;left:0;height:3px;background:var(--gold);width:0;z-index:70;transition:width .3s}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
-/* ---------- mobile: ເມນູໄອຄອນນ້ອຍຢູ່ຊ້າຍ + ເນື້ອຫາເຕັມຈໍ ---------- */
+/* ---------- mobile: ເມນູລວງນອນຢູ່ເທິງ + ເນື້ອຫາເຕັມຈໍ ---------- */
 @media (max-width:860px){
-  .app{grid-template-columns:46px 1fr}
-  nav.side{position:sticky;top:0;height:100vh;height:100dvh;padding:6px 2px;gap:2px;
-    overflow-y:auto;overflow-x:hidden;align-self:start}
+  .app{grid-template-columns:1fr}
+  nav.side{
+    position:sticky;top:env(safe-area-inset-top,0px);z-index:40;
+    height:auto;display:flex;flex-direction:row;gap:2px;
+    padding:6px;overflow-x:auto;overflow-y:hidden;
+    -webkit-overflow-scrolling:touch;scrollbar-width:none;
+    box-shadow:0 2px 8px rgba(0,0,0,.18)
+  }
+  nav.side::-webkit-scrollbar{display:none}
   .brand{display:none}
-  nav.side button{font-size:0;justify-content:center;padding:10px 0;gap:0;width:100%}
-  nav.side .ico{font-size:21px;width:auto}
+  nav.side button{
+    flex:0 0 auto;width:auto;min-width:64px;
+    flex-direction:column;justify-content:center;text-align:center;
+    gap:2px;padding:6px 10px;font-size:11px;line-height:1.25;white-space:nowrap
+  }
+  nav.side .ico{font-size:20px;width:auto}
   main{padding:12px 8px 40px}
   h1{font-size:20px;margin-bottom:12px}
   .panel{padding:12px;overflow-x:auto}
