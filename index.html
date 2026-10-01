@@ -151,17 +151,16 @@ textarea{min-height:70px;resize:vertical}
 /* ---------- mobile: ເມນູລວງນອນຢູ່ເທິງ + ເນື້ອຫາເຕັມຈໍ ---------- */
 @media (max-width:860px){
   .app{grid-template-columns:1fr}
-  nav.side{
+   nav.side{
     position:sticky;top:env(safe-area-inset-top,0px);z-index:40;
-    height:auto;display:flex;flex-direction:row;gap:2px;
+    height:auto;max-height:76px;align-self:start;
+    display:flex;flex-direction:row;align-items:flex-start;gap:2px;
     padding:6px;overflow-x:auto;overflow-y:hidden;
     -webkit-overflow-scrolling:touch;scrollbar-width:none;
     box-shadow:0 2px 8px rgba(0,0,0,.18)
   }
-  nav.side::-webkit-scrollbar{display:none}
-  .brand{display:none}
   nav.side button{
-    flex:0 0 auto;width:auto;min-width:64px;
+    flex:0 0 auto;width:auto;min-width:64px;height:auto;
     flex-direction:column;justify-content:center;text-align:center;
     gap:2px;padding:6px 10px;font-size:11px;line-height:1.25;white-space:nowrap
   }
@@ -177,6 +176,7 @@ textarea{min-height:70px;resize:vertical}
   .chatbox{height:calc(100vh - 230px)}
   .modal-bg{padding:12px 6px}
   #toast{bottom:calc(20px + env(safe-area-inset-bottom,0px))}
+    input[type=date]{min-height:42px}
 }
 </style>
 </head>
